@@ -1,0 +1,6 @@
+vendor/
+composer.phar
+tests.txt
+.idea/
+backup/
+notes.txt
