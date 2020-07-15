@@ -1,4 +1,4 @@
-# Fire Line - PHP WAF (Web Application Firewall)
+# Fire Line - Web Application Firewall (WAF) for PHP
 
 > PHP based WAF (Web Application Firewall)
 
