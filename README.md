@@ -2,7 +2,9 @@
 
 > PHP based WAF (Web Application Firewall)
 
-Copy fireline.php file in `config-webroot` folder to the web root of your web app, in `Laravel`,`CodeIgniter` it is in the `/public` folder. Also, make sure the `fireline` directory is one above the web root:
+To install:
+
+Download project, then copy `fireline` __folder__ above web root and copy fireline.php file in `config-webroot` folder to the web root of your web app, in `Laravel`,`CodeIgniter` it is in the `/public` folder. Also, make sure the `fireline` directory is one above the web root:
 
 ````
 | fireline/
