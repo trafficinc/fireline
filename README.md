@@ -6,9 +6,15 @@ Copy fireline.php file in `config-webroot` folder to the web root of your web ap
 
 > Must also add `php_prepend` directive depending on your web server configuration:
 
-* php ini: create or add to `.htaccess` or `php.ini`; `php_value auto_prepend_file "full_path_to_the_include_directory/fireline.php"`
+* php ini: create or add to .htaccess or php.ini: 
 
-* user ini: create and add or create a `.user.ini` file in web root, add line: `auto_prepend_file = fireline.php`
+`php_value auto_prepend_file "full_path_to_the_include_directory/fireline.php"`
+
+* user ini: create and add or create a `.user.ini` file in web root, add line: 
+
+`auto_prepend_file = fireline.php`
+
+-----------------
 
 In the `/fireline/src/Fireline.php` file:
 
