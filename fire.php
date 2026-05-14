@@ -13,6 +13,7 @@ require "autoload.php";
 require "./cli/Cli/clihelpers.php";
 
 use Cli\Cli;
+use Cli\CommandArgs;
 use Fireline\Config\ConfigChecker;
 use Fireline\Learning\BaselineBuilder;
 use Fireline\Learning\RouteModelExporter;
@@ -56,14 +57,8 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 });
 
 $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
-    $ciMode = in_array('--ci', $argv, true);
-    $path = __DIR__ . '/storage/replay/traffic.ndjson';
-    foreach (array_slice($argv, 2) as $arg) {
-        if (strpos($arg, '--') !== 0) {
-            $path = $arg;
-            break;
-        }
-    }
+    $ciMode = CommandArgs::hasFlag($argv, '--ci');
+    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/replay/traffic.ndjson');
 
     $result = (new ReplayRunner())->replay($path);
 
@@ -112,8 +107,8 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
 });
 
 $cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
-    $path = $argv[2] ?? __DIR__ . '/storage/replay/traffic.ndjson';
-    $minSamples = isset($argv[3]) ? max(1, (int) $argv[3]) : 3;
+    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/replay/traffic.ndjson');
+    $minSamples = CommandArgs::intValue($argv, 3, 3);
     $model = BaselineBuilder::buildFromReplayFile($path, $minSamples);
 
     $cli->getPrinter()->display(
