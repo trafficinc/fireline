@@ -14,6 +14,7 @@ require "./cli/Cli/clihelpers.php";
 
 use Cli\Cli;
 use Fireline\Learning\BaselineBuilder;
+use Fireline\Learning\RouteModelExporter;
 use Fireline\Replay\ReplayRunner;
 
 $cli = new Cli();
@@ -58,8 +59,25 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
     $lines = [
         'Replay file: ' . $path,
         'Events replayed: ' . $result['total'],
+        'Invalid lines: ' . ($result['invalid'] ?? 0),
         'Regressions: ' . count($result['regressions']),
     ];
+
+    if (isset($result['summary']['by_type']) && is_array($result['summary']['by_type'])) {
+        $lines[] = 'By type:';
+        foreach ($result['summary']['by_type'] as $type => $count) {
+            if ($count > 0) {
+                $lines[] = '- ' . $type . ': ' . $count;
+            }
+        }
+    }
+
+    if (isset($result['summary']['by_route']) && is_array($result['summary']['by_route']) && $result['summary']['by_route'] !== []) {
+        $lines[] = 'By route:';
+        foreach (array_slice($result['summary']['by_route'], 0, 10, true) as $route => $count) {
+            $lines[] = '- ' . $route . ': ' . $count;
+        }
+    }
 
     foreach ($result['regressions'] as $index => $regression) {
         $lines[] = '';
@@ -67,6 +85,8 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
         $lines[] = 'Route: ' . ($regression['route'] ?? '');
         $lines[] = 'Previous Score: ' . ($regression['previous_score'] ?? 0);
         $lines[] = 'Current Score: ' . ($regression['current_score'] ?? 0);
+        $lines[] = 'Previous Blocked: ' . (!empty($regression['previous_blocked']) ? 'yes' : 'no');
+        $lines[] = 'Current Blocked: ' . (!empty($regression['current_blocked']) ? 'yes' : 'no');
 
         if (isset($regression['explanation']) && is_array($regression['explanation'])) {
             $lines[] = 'Reason: ' . ($regression['explanation']['reason'] ?? '');
@@ -85,7 +105,7 @@ $cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
         "Replay file: " . $path . PHP_EOL .
         "Minimum samples: " . $minSamples . PHP_EOL .
         "Route model:" . PHP_EOL .
-        var_export($model, true)
+        RouteModelExporter::toPhp($model)
     );
 });
 

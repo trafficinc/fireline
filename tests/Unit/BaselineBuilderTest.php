@@ -1,6 +1,7 @@
 <?php
 
 use Fireline\Learning\BaselineBuilder;
+use Fireline\Learning\RouteModelExporter;
 use PHPUnit\Framework\TestCase;
 
 class BaselineBuilderTest extends TestCase
@@ -57,6 +58,24 @@ class BaselineBuilderTest extends TestCase
         $model = BaselineBuilder::build($events, 3);
 
         $this->assertSame('A-N', $model['/invite']['fields']['post.code']['shape']);
+    }
+
+    public function testExportsRouteModelsAsPhpConfigFragment(): void
+    {
+        $php = RouteModelExporter::toPhp([
+            '/login' => [
+                'fields' => [
+                    'post.username' => [
+                        'type' => 'alnum',
+                        'max_length' => 64,
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertStringStartsWith('<?php', $php);
+        $this->assertStringContainsString("'post.username' => [", $php);
+        $this->assertStringContainsString("'type' => 'alnum'", $php);
     }
 
     protected function event(string $route, string $field, string $value, bool $blocked): array

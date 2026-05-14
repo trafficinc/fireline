@@ -218,7 +218,7 @@ Use `$decision->explanation()` when structured data is easier to display or stor
 
 ## Replay
 
-Replay mode stores normalized request fields, matched rules, scores, and decisions as JSON lines. Enable it in config:
+Replay mode stores normalized request fields, matched rules, scores, and decisions as JSON lines. Sensitive fields such as passwords, tokens, API keys, secrets, and authorization values are redacted before writing replay data. Enable it in config:
 
 ```php
 'replay_enabled' => true,
@@ -237,7 +237,7 @@ foreach ($result['regressions'] as $regression) {
 }
 ```
 
-Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, score increases, and false-positive regressions before deployment.
+Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, missed blocks, score increases, and false-positive regressions before deployment. Invalid replay lines are counted separately so corrupt capture files are visible.
 
 The same replay check is available from the CLI:
 
@@ -250,6 +250,8 @@ Build route model candidates from replay data:
 ```bash
 php fire.php baseline:build storage/replay/traffic.ndjson 10
 ```
+
+`baseline:build` prints a PHP `config/routes.php` fragment for review.
 
 ## Rule Files
 
