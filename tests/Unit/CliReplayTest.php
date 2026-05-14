@@ -313,6 +313,50 @@ class CliReplayTest extends TestCase
         $this->assertFileDoesNotExist($destination);
     }
 
+    public function testBaselineExportRefusesToOverwriteWithoutForce(): void
+    {
+        $destination = sys_get_temp_dir() . '/fireline-routes-' . uniqid('', true) . '.php';
+        file_put_contents($destination, "<?php\n\nreturn ['existing' => true];\n");
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '100')) . PHP_EOL);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '101')) . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '102')) . PHP_EOL, FILE_APPEND);
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php baseline:export ' . escapeshellarg($this->path) . ' 3 ' . escapeshellarg($destination);
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(1, $exitCode);
+            $this->assertStringContainsString('use --force to overwrite', implode("\n", $output));
+            $this->assertSame(['existing' => true], require $destination);
+        } finally {
+            if (is_file($destination)) {
+                unlink($destination);
+            }
+        }
+    }
+
+    public function testBaselineExportCanOverwriteWithForce(): void
+    {
+        $destination = sys_get_temp_dir() . '/fireline-routes-' . uniqid('', true) . '.php';
+        file_put_contents($destination, "<?php\n\nreturn ['existing' => true];\n");
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '100')) . PHP_EOL);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '101')) . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '102')) . PHP_EOL, FILE_APPEND);
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php baseline:export ' . escapeshellarg($this->path) . ' 3 ' . escapeshellarg($destination) . ' --force';
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(0, $exitCode);
+            $model = require $destination;
+            $this->assertSame('int', $model['/orders']['fields']['get.id']['type']);
+        } finally {
+            if (is_file($destination)) {
+                unlink($destination);
+            }
+        }
+    }
+
     public function testMetricsShowDisplaysSnapshot(): void
     {
         $command = escapeshellarg(PHP_BINARY) . ' fire.php metrics:show';

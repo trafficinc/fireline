@@ -46,6 +46,7 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 |              |  php fire.php baseline:build storage/replay/traffic.ndjson 10 --json --report |
 |              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php |
 |              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --dry-run |
+|              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --force |
 |              |  php fire.php metrics:show storage/metrics/fireline-metrics.json --summary |
 |              |  php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json |
 +--------------+-------------------------------------------+";
@@ -159,6 +160,11 @@ $cli->registerCommand('baseline:export', function (array $argv) use ($cli) {
     if (CommandArgs::hasFlag($argv, '--dry-run')) {
         $cli->getPrinter()->display(implode(PHP_EOL, $lines));
         return;
+    }
+
+    if (is_file($destination) && !CommandArgs::hasFlag($argv, '--force')) {
+        $cli->getPrinter()->display('Route model exists; use --force to overwrite: ' . $destination);
+        exit(1);
     }
 
     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {

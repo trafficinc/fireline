@@ -283,10 +283,11 @@ php fire.php baseline:build storage/replay/traffic.ndjson 10 --json
 php fire.php baseline:build storage/replay/traffic.ndjson 10 --json --report
 php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php
 php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --dry-run
+php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --force
 ```
 
 `baseline:build` prints a PHP `config/routes.php` fragment for review by default. Use `--json` when automation needs the candidate model directly, or `--json --report` when it also needs replay read counts and invalid-line counts.
-Use `baseline:export` to write the reviewed candidate model to a target PHP file. Add `--dry-run` to preview the destination and replay counts without writing.
+Use `baseline:export` to write the reviewed candidate model to a target PHP file. Add `--dry-run` to preview the destination and replay counts without writing. Existing files are not overwritten unless `--force` is supplied.
 
 Validate configuration and writable paths:
 
