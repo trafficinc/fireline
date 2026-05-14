@@ -66,4 +66,18 @@ class ConfigCheckerTest extends TestCase
 
         $this->assertSame('ok', $storageCheck['status']);
     }
+
+    public function testReportsMetricsPathWhenConfigured(): void
+    {
+        $result = (new ConfigChecker(dirname(__DIR__, 2)))->check([
+            'metrics_path' => sys_get_temp_dir() . '/fireline-metrics-' . uniqid('', true) . '/metrics.json',
+        ]);
+
+        $metricsCheck = array_values(array_filter($result['checks'], function (array $check): bool {
+            return $check['name'] === 'metrics_path';
+        }))[0];
+
+        $this->assertSame('ok', $metricsCheck['status']);
+        $this->assertStringContainsString('Will create under writable parent', $metricsCheck['message']);
+    }
 }

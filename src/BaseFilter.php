@@ -57,6 +57,39 @@ abstract class BaseFilter
         return null;
     }
 
+    protected function unsafeEngineRuleFor(string $value, array $configs, array $categories): ?string
+    {
+        $engineConfig = array_merge([
+            'paranoia_level' => 'strict',
+            'regex_threshold' => 1,
+            'score_threshold' => 12,
+        ], $configs);
+
+        $normalizer = new \Fireline\Normalize\Normalizer();
+        $thresholds = new \Fireline\Scoring\Thresholds($engineConfig);
+        $inspector = new \Fireline\Engine\FieldInspector($thresholds);
+        $field = new \Fireline\Extract\RequestField('legacy.value', $value, 'legacy');
+        $request = [
+            'method' => (string) ($engineConfig['request_method'] ?? 'GET'),
+            'route' => (string) ($engineConfig['route'] ?? ''),
+        ];
+
+        $result = $inspector->inspect($request, $field, $normalizer->run($value), false);
+        if ($result === null || $result->score() < $thresholds->blockThreshold()) {
+            return null;
+        }
+
+        $allowed = array_flip(array_map('strtolower', $categories));
+        foreach ($result->toArray()['matches'] as $match) {
+            $category = strtolower((string) ($match['category'] ?? ''));
+            if (isset($allowed[$category])) {
+                return (string) ($match['id'] ?? $category);
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Check given string
      *

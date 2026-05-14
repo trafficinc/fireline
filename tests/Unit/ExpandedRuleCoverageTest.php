@@ -24,12 +24,38 @@ class ExpandedRuleCoverageTest extends TestCase
         $this->assertContains('SCANNER_SQLMAP', array_column($result->toArray()['matches'], 'id'));
     }
 
+    public function testBlocksNiktoScannerFingerprintAtMediumParanoia(): void
+    {
+        $result = $this->inspect('header.User-Agent', 'Nikto/2.5.0', 'medium', 'header');
+
+        $this->assertGreaterThanOrEqual(25, $result->score());
+        $this->assertContains('SCANNER_NIKTO', array_column($result->toArray()['matches'], 'id'));
+    }
+
     public function testBlocksWebshellEvalPostAtHighParanoia(): void
     {
         $result = $this->inspect('post.code', '<?php eval($_POST["cmd"]); ?>', 'high');
 
         $this->assertGreaterThanOrEqual(18, $result->score());
         $this->assertContains('WEBSHELL_EVAL_POST_CALL', array_column($result->toArray()['matches'], 'id'));
+    }
+
+    public function testBlocksWebshellSystemGetAtHighParanoia(): void
+    {
+        $result = $this->inspect('post.code', '<?php system($_GET["cmd"]); ?>', 'high');
+
+        $this->assertGreaterThanOrEqual(18, $result->score());
+        $this->assertContains('WEBSHELL_SYSTEM_GET_CALL', array_column($result->toArray()['matches'], 'id'));
+    }
+
+    public function testBlocksBoundedTraversalToSensitiveFiles(): void
+    {
+        $result = $this->inspect('get.file', 'file=../../../../etc/passwd', 'medium');
+        $benign = $this->inspect('get.path', 'path=../docs/readme.txt', 'medium');
+
+        $this->assertGreaterThanOrEqual(24, $result->score());
+        $this->assertContains('LFI_TRAVERSAL_SENSITIVE_FILE', array_column($result->toArray()['matches'], 'id'));
+        $this->assertLessThan(25, $benign->score());
     }
 
     public function testStrictRemoteFileInclusionRequiresScriptLikeUrl(): void

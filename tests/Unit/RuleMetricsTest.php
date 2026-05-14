@@ -76,4 +76,29 @@ class RuleMetricsTest extends TestCase
 
         $this->assertSame([], RuleMetrics::snapshot()['counters']);
     }
+
+    public function testSnapshotFromNormalizesExternalMetricData(): void
+    {
+        $snapshot = RuleMetrics::snapshotFrom([
+            'cache.safe.hit' => '2',
+            'cache.safe.miss' => '2',
+        ], [
+            'rule.fast' => [
+                'count' => '1',
+                'total_ms' => '0.5',
+                'max_ms' => '0.5',
+            ],
+            'broken' => 'not-a-timing',
+            'rule.slow' => [
+                'count' => '1',
+                'total_ms' => '3.0',
+                'max_ms' => '3.0',
+            ],
+        ]);
+
+        $this->assertSame(2, $snapshot['counters']['cache.safe.hit']);
+        $this->assertSame(0.5, $snapshot['cache_hit_ratios']['safe']);
+        $this->assertArrayNotHasKey('broken', $snapshot['timings']);
+        $this->assertSame(['rule.slow', 'rule.fast'], array_keys($snapshot['slowest_rules']));
+    }
 }

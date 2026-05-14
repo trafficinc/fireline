@@ -3,6 +3,8 @@
 use Fireline\Cache\SafeCache;
 use Fireline\Cache\ThreatCache;
 use Fireline\Engine\WafEngine;
+use Fireline\Telemetry\MetricsStore;
+use Fireline\Telemetry\RuleMetrics;
 use PHPUnit\Framework\TestCase;
 
 class WafEngineTest extends TestCase
@@ -20,6 +22,8 @@ class WafEngineTest extends TestCase
         $_COOKIE = [];
         SafeCache::reset();
         ThreatCache::reset();
+        RuleMetrics::reset();
+        RuleMetrics::enable(true);
     }
 
     protected function tearDown(): void
@@ -111,5 +115,45 @@ class WafEngineTest extends TestCase
         $this->assertTrue($decision->shouldBlock());
         $this->assertSame('request_limit', $decision->reason());
         $this->assertSame('REQUEST_LIMIT_MAX_FIELDS', $decision->matchedResult()['matches'][0]['id']);
+    }
+
+    public function testPersistsMetricsWhenMetricsPathIsConfigured(): void
+    {
+        $path = sys_get_temp_dir() . '/fireline-engine-metrics-' . uniqid('', true) . '.json';
+        $_GET['q'] = 'stainless steel washers';
+
+        try {
+            (new WafEngine(['metrics_path' => $path]))->inspectCurrentRequest();
+
+            $snapshot = MetricsStore::read($path);
+
+            $this->assertGreaterThanOrEqual(1, $snapshot['counters']['request_limits.evaluated']);
+            $this->assertArrayHasKey('scanner.aho_corasick', $snapshot['timings']);
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    public function testPersistedMetricsAreStoredAsRequestDeltas(): void
+    {
+        $path = sys_get_temp_dir() . '/fireline-engine-metrics-' . uniqid('', true) . '.json';
+
+        try {
+            $_GET['q'] = 'stainless steel washers';
+            (new WafEngine(['metrics_path' => $path]))->inspectCurrentRequest();
+
+            $_GET['q'] = 'socket head cap screws';
+            (new WafEngine(['metrics_path' => $path]))->inspectCurrentRequest();
+
+            $snapshot = MetricsStore::read($path);
+
+            $this->assertSame(2, $snapshot['counters']['request_limits.evaluated']);
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
     }
 }

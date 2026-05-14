@@ -25,7 +25,7 @@ class Query extends BaseFilter
             $value = $this->normalize($value);
         }
 
-        return parent::safe($value, $configs);
+        return $this->unsafeEngineRuleFor($value, $configs, ['xss', 'shell', 'lfi', 'rfi', 'webshell', 'scanner']) === null;
     }
 
     private function normalize($string){

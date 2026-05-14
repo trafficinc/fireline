@@ -47,6 +47,29 @@ class RuleLoader
         return (new RuleGroup(self::forParanoia($paranoia)))->byType('regex');
     }
 
+    public static function metadataFor(string $paranoia): array
+    {
+        $rules = self::forParanoia($paranoia);
+        $fingerprintSource = array_map(function (Rule $rule): array {
+            $data = $rule->toArray();
+
+            return [
+                'id' => (string) ($data['id'] ?? ''),
+                'type' => (string) ($data['type'] ?? ''),
+                'pattern' => (string) ($data['pattern'] ?? ''),
+                'score' => (int) ($data['score'] ?? 0),
+                'category' => (string) ($data['category'] ?? ''),
+                'paranoia' => $rule->paranoia(),
+                'requires' => $rule->requires(),
+            ];
+        }, $rules);
+
+        return [
+            'count' => count($rules),
+            'fingerprint' => sha1(json_encode($fingerprintSource)),
+        ];
+    }
+
     public static function forParanoia(string $paranoia): array
     {
         $max = self::$order[self::normalizeParanoia($paranoia)];

@@ -39,6 +39,30 @@ class MetricsFormatter
         return is_string($encoded) ? $encoded : '{}';
     }
 
+    public static function summary(array $snapshot, int $limit = 10): string
+    {
+        $lines = ['Metrics summary'];
+
+        $counters = is_array($snapshot['counters'] ?? null) ? $snapshot['counters'] : [];
+        arsort($counters);
+        $lines[] = '';
+        $lines[] = 'Top counters:';
+        self::appendLimited($lines, $counters, $limit);
+
+        $ratios = is_array($snapshot['cache_hit_ratios'] ?? null) ? $snapshot['cache_hit_ratios'] : [];
+        arsort($ratios);
+        $lines[] = '';
+        $lines[] = 'Cache hit ratios:';
+        self::appendLimited($lines, $ratios, $limit);
+
+        $slowest = is_array($snapshot['slowest_rules'] ?? null) ? $snapshot['slowest_rules'] : [];
+        $lines[] = '';
+        $lines[] = 'Slowest timings:';
+        self::appendLimited($lines, $slowest, $limit);
+
+        return implode(PHP_EOL, $lines);
+    }
+
     protected static function value($value): string
     {
         if (is_array($value)) {
@@ -51,6 +75,18 @@ class MetricsFormatter
         }
 
         return self::scalar($value);
+    }
+
+    protected static function appendLimited(array &$lines, array $values, int $limit): void
+    {
+        if ($values === []) {
+            $lines[] = '- none';
+            return;
+        }
+
+        foreach (array_slice($values, 0, max(1, $limit), true) as $name => $value) {
+            $lines[] = '- ' . $name . ': ' . self::value($value);
+        }
     }
 
     protected static function scalar($value): string

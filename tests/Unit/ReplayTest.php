@@ -75,6 +75,18 @@ class ReplayTest extends TestCase
         $this->assertSame(18, $event['metadata']['thresholds']['score_threshold']);
     }
 
+    public function testEngineReplayMetadataIncludesRuleFingerprint(): void
+    {
+        $metadata = (new WafEngine([
+            'replay_enabled' => false,
+            'paranoia_level' => 'medium',
+        ]))->replayMetadata();
+
+        $this->assertArrayHasKey('rules', $metadata);
+        $this->assertGreaterThan(0, $metadata['rules']['count']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{40}$/', $metadata['rules']['fingerprint']);
+    }
+
     public function testRecorderRedactsSensitiveFields(): void
     {
         $context = new RequestContext([
@@ -144,6 +156,17 @@ class ReplayTest extends TestCase
         $this->assertGreaterThanOrEqual(25, $result['regressions'][0]['current_score']);
     }
 
+    public function testRunnerReturnsFullResultShapeWhenReplayFileIsMissing(): void
+    {
+        $result = (new ReplayRunner(new WafEngine(['replay_enabled' => false])))->replay($this->path);
+
+        $this->assertSame(0, $result['total']);
+        $this->assertSame(0, $result['invalid']);
+        $this->assertSame([], $result['regressions']);
+        $this->assertSame(0, $result['summary']['total']);
+        $this->assertArrayHasKey('current', $result['metadata']);
+    }
+
     public function testRunnerFlagsMetadataChangesOnRegression(): void
     {
         $event = [
@@ -197,6 +220,8 @@ class ReplayTest extends TestCase
         ])))->replay($this->path);
 
         $this->assertTrue($result['regressions'][0]['metadata_changed']);
+        $this->assertContains('paranoia_level', $result['regressions'][0]['metadata_diff']['changed']);
+        $this->assertContains('thresholds', $result['regressions'][0]['metadata_diff']['changed']);
         $this->assertSame('medium', $result['metadata']['current']['paranoia_level']);
     }
 

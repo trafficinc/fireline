@@ -12,17 +12,12 @@ class BotHandler extends AbstractHandler
     public function handle(string $filter, array $request): ?string
     {
         if ($filter === "bot") {
-
             $bots = new BotGuard();
             $userAgent = $request['headers']['User-Agent'] ?? '';
-            $botSafe = $bots->safe($userAgent);
-            if (!$botSafe) {
-                $this->handleService($bots->found(), $filter, $request['request_method']);
-            } else {
-                return parent::handle($filter, $request);
-            }
-        }
-        return parent::handle($filter, $request);
 
+            return $this->blockOrForward($bots->safe($userAgent) ? null : $bots->found(), $filter, $request);
+        }
+
+        return parent::handle($filter, $request);
     }
 }

@@ -22,14 +22,9 @@ class QueryHandler extends AbstractHandler
                 'query' => 'query',
             ]);
 
-            if ($badValue !== null) {
-                $this->handleService($request['query_string'], $filter, $request['request_method']);
-            } else {
-                return parent::handle($filter, $request);
-            }
-
+            return $this->blockOrForward($badValue === null ? null : (string) ($request['query_string'] ?? ''), $filter, $request);
         }
-        return parent::handle($filter, $request);
 
+        return parent::handle($filter, $request);
     }
 }

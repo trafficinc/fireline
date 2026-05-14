@@ -97,6 +97,7 @@ return [
     'inspect_json' => true,
     'inspect_headers' => true,
     'inspect_raw_body' => true,
+    'metrics_path' => null,
     'score_threshold' => null,
     'regex_threshold' => null,
     'safe_cache_threshold' => null,
@@ -122,6 +123,7 @@ Config options:
 - `paranoia_level`: detection posture. Supported values are `low`, `medium`, `high`, and `strict`.
 - `replay_enabled`: writes normalized replay events when set to `true`.
 - `replay_path`: JSON-lines replay file path.
+- `metrics_path`: optional JSON file path for persisted aggregate metrics.
 - `score_threshold`: field score required to block a request.
 - `regex_threshold`: score required before conditional regex rules run.
 - `safe_cache_threshold`: maximum score eligible for short-lived safe fingerprint caching.
@@ -249,7 +251,7 @@ foreach ($result['regressions'] as $regression) {
 }
 ```
 
-Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, missed blocks, score increases, and false-positive regressions before deployment. Invalid replay lines are counted separately so corrupt capture files are visible.
+Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, missed blocks, score increases, and false-positive regressions before deployment. Replay metadata includes thresholds, paranoia level, selected config values, and an active rule-set fingerprint so config changes and rule changes can be distinguished. When metadata differs, replay output reports the changed metadata groups, such as `thresholds`, `config`, or `rules`. Invalid replay lines are counted separately so corrupt capture files are visible.
 
 The same replay check is available from the CLI:
 
@@ -261,6 +263,12 @@ Use `--ci` to return a non-zero exit code when replay regressions are found:
 
 ```bash
 php fire.php replay:run storage/replay/traffic.ndjson --ci
+```
+
+Use `--json` when automation needs the full replay result:
+
+```bash
+php fire.php replay:run storage/replay/traffic.ndjson --json
 ```
 
 Build route model candidates from replay data:
@@ -370,6 +378,22 @@ Current instrumentation tracks:
 - Safe/threat cache writes
 - Manual false-positive counters
 
+To persist metrics across web requests, set `metrics_path`:
+
+```php
+'metrics_path' => __DIR__ . '/storage/metrics/fireline-metrics.json',
+```
+
+The metrics file stores an aggregate snapshot. Each inspected request contributes its current metrics delta, and malformed or partially written metrics files are treated as empty snapshots on the next write.
+
+Then inspect the persisted aggregate from the CLI:
+
+```bash
+php fire.php metrics:show storage/metrics/fireline-metrics.json
+php fire.php metrics:show storage/metrics/fireline-metrics.json --json
+php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json
+```
+
 ## CLI And Development Commands
 
 Run tests:
@@ -398,13 +422,16 @@ composer run smoke
 composer run lint
 ```
 
-The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `config:check`, and `metrics:show`.
+The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `config:check`, `metrics:show`, `metrics:export`, and `metrics:reset`.
 
 Show the current in-process metrics snapshot:
 
 ```bash
 php fire.php metrics:show
 php fire.php metrics:show --json
+php fire.php metrics:show storage/metrics/fireline-metrics.json --summary
+php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json
+php fire.php metrics:reset storage/metrics/fireline-metrics.json
 ```
 
 ## Troubleshooting

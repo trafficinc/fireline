@@ -10,4 +10,9 @@ class XSS extends BaseFilter
      * @var string
      */
     protected $compares_file = "xss.php";
+
+    public function safe(string $value, array $configs): bool
+    {
+        return $this->unsafeEngineRuleFor($value, $configs, ['xss']) === null;
+    }
 }

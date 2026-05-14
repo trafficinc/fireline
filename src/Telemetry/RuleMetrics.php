@@ -64,24 +64,65 @@ class RuleMetrics
 
     public static function snapshot(): array
     {
+        return self::snapshotFrom(self::$counters, self::$timings);
+    }
+
+    public static function snapshotFrom(array $counters, array $timings): array
+    {
+        $counters = self::normalizeCounters($counters);
+        $timings = self::normalizeTimings($timings);
+
         return [
-            'counters' => self::$counters,
-            'timings' => self::$timings,
-            'cache_hit_ratios' => self::cacheHitRatios(),
-            'slowest_rules' => self::slowestRules(),
+            'counters' => $counters,
+            'timings' => $timings,
+            'cache_hit_ratios' => self::cacheHitRatiosFrom($counters),
+            'slowest_rules' => self::slowestRulesFrom($timings),
         ];
+    }
+
+    protected static function normalizeCounters(array $counters): array
+    {
+        $normalized = [];
+        foreach ($counters as $name => $count) {
+            $normalized[(string) $name] = (int) $count;
+        }
+
+        return $normalized;
+    }
+
+    protected static function normalizeTimings(array $timings): array
+    {
+        $normalized = [];
+        foreach ($timings as $name => $timing) {
+            if (!is_array($timing)) {
+                continue;
+            }
+
+            $normalized[(string) $name] = [
+                'count' => max(0, (int) ($timing['count'] ?? 0)),
+                'total_ms' => max(0.0, (float) ($timing['total_ms'] ?? 0)),
+                'max_ms' => max(0.0, (float) ($timing['max_ms'] ?? 0)),
+            ];
+        }
+
+        return $normalized;
     }
 
     protected static function cacheHitRatios(): array
     {
+        return self::cacheHitRatiosFrom(self::$counters);
+    }
+
+    protected static function cacheHitRatiosFrom(array $counters): array
+    {
         $ratios = [];
-        foreach (self::$counters as $name => $count) {
+        foreach ($counters as $name => $count) {
             if (substr($name, -4) !== '.hit') {
                 continue;
             }
 
             $cache = substr($name, 6, -4);
-            $misses = self::$counters['cache.' . $cache . '.miss'] ?? 0;
+            $misses = $counters['cache.' . $cache . '.miss'] ?? 0;
             $total = $count + $misses;
             $ratios[$cache] = $total > 0 ? $count / $total : 0.0;
         }
@@ -91,9 +132,13 @@ class RuleMetrics
 
     protected static function slowestRules(): array
     {
-        $timings = self::$timings;
+        return self::slowestRulesFrom(self::$timings);
+    }
+
+    protected static function slowestRulesFrom(array $timings): array
+    {
         uasort($timings, function (array $a, array $b) {
-            return $b['max_ms'] <=> $a['max_ms'];
+            return ((float) ($b['max_ms'] ?? 0)) <=> ((float) ($a['max_ms'] ?? 0));
         });
 
         return $timings;

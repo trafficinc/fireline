@@ -26,6 +26,7 @@ class ConfigChecker
             $this->threshold('safe_cache_threshold', $config),
             $this->storageDirectory(),
             $this->writablePath('replay_path', (string) ($config['replay_path'] ?? '')),
+            $this->optionalWritablePath('metrics_path', $config['metrics_path'] ?? null),
             $this->writablePath('log_file', $this->logPath()),
             $this->apcu(),
         ];
@@ -48,6 +49,7 @@ class ConfigChecker
             'max_body_length' => 1048576,
             'max_value_length' => 8192,
             'replay_path' => $this->root . '/storage/replay/traffic.ndjson',
+            'metrics_path' => null,
             'score_threshold' => null,
             'regex_threshold' => null,
             'safe_cache_threshold' => null,
@@ -152,6 +154,19 @@ class ConfigChecker
             'status' => 'error',
             'message' => 'Directory is not writable: ' . $dir,
         ];
+    }
+
+    protected function optionalWritablePath(string $name, $path): array
+    {
+        if ($path === null || $path === '') {
+            return [
+                'name' => $name,
+                'status' => 'ok',
+                'message' => 'Disabled',
+            ];
+        }
+
+        return $this->writablePath($name, (string) $path);
     }
 
     protected function storageDirectory(): array

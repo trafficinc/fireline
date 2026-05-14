@@ -22,11 +22,25 @@ abstract class AbstractHandler implements Handler
 
     public function handle(string $filter, array $request): ?string
     {
+        return $this->forward($filter, $request);
+    }
+
+    protected function forward(string $filter, array $request): ?string
+    {
         if ($this->nextHandler) {
             return $this->nextHandler->handle($filter, $request);
         }
 
         return null;
+    }
+
+    protected function blockOrForward(?string $badValue, string $filter, array $request): ?string
+    {
+        if ($badValue !== null) {
+            $this->handleService($badValue, $filter, $request['request_method'] ?? '');
+        }
+
+        return $this->forward($filter, $request);
     }
 
     protected function firstUnsafeValue($filter, array $request): ?string

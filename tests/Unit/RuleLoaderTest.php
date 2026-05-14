@@ -41,6 +41,18 @@ class RuleLoaderTest extends TestCase
         $this->assertGreaterThan(count($lowIds), count($strictIds));
     }
 
+    public function testRuleMetadataFingerprintTracksActiveParanoiaRules(): void
+    {
+        $low = RuleLoader::metadataFor('low');
+        $strict = RuleLoader::metadataFor('strict');
+
+        $this->assertGreaterThan(0, $low['count']);
+        $this->assertGreaterThan($low['count'], $strict['count']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{40}$/', $low['fingerprint']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{40}$/', $strict['fingerprint']);
+        $this->assertNotSame($low['fingerprint'], $strict['fingerprint']);
+    }
+
     public function testRegexRulesHavePreconditionsAndBenchmarkNotes(): void
     {
         foreach (RuleLoader::regexRules() as $rule) {

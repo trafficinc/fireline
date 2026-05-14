@@ -2,6 +2,7 @@
 
 use Handlers\BotHandler;
 use Handlers\Handler;
+use Handlers\IpHandler;
 use Handlers\QueryHandler;
 use Handlers\SqlHandler;
 use Handlers\XssHandler;
@@ -39,6 +40,11 @@ class RecordingQueryHandler extends QueryHandler
 }
 
 class RecordingBotHandler extends BotHandler
+{
+    use RecordsBlockedRequests;
+}
+
+class RecordingIpHandler extends IpHandler
 {
     use RecordsBlockedRequests;
 }
@@ -206,6 +212,38 @@ class HandlersTest extends TestCase
 
         $handler->handle('bot', $this->request([
             'headers' => ['User-Agent' => 'Mozilla/5.0 AppleWebKit/537.36 Chrome/120 Safari/537.36'],
+        ]));
+
+        $this->assertFalse($handler->blocked);
+    }
+
+    public function testIpHandlerBlocksUnsafeIp(): void
+    {
+        $handler = new RecordingIpHandler();
+
+        $handler->handle('ip', $this->request([
+            'ip' => '203.0.113.10',
+            'configs' => [
+                'ip_by_country' => false,
+                'whitelist' => true,
+            ],
+        ]));
+
+        $this->assertTrue($handler->blocked);
+        $this->assertSame('ip', $handler->blockedFilter);
+        $this->assertSame('203.0.113.10', $handler->blockedValue);
+    }
+
+    public function testIpHandlerAllowsUnlistedIp(): void
+    {
+        $handler = new RecordingIpHandler();
+
+        $handler->handle('ip', $this->request([
+            'ip' => '192.0.2.10',
+            'configs' => [
+                'ip_by_country' => false,
+                'whitelist' => false,
+            ],
         ]));
 
         $this->assertFalse($handler->blocked);

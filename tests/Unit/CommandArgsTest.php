@@ -18,6 +18,13 @@ class CommandArgsTest extends TestCase
         $this->assertSame('storage/replay/traffic.ndjson', CommandArgs::firstValue($argv, 2, 'default'));
     }
 
+    public function testReturnsAllNonFlagValues(): void
+    {
+        $argv = ['fire.php', 'metrics:export', '--json', 'metrics.json', '--force', 'export.json'];
+
+        $this->assertSame(['metrics.json', 'export.json'], CommandArgs::values($argv, 2));
+    }
+
     public function testIntValueHonorsMinimum(): void
     {
         $argv = ['fire.php', 'baseline:build', 'traffic.ndjson', '0'];

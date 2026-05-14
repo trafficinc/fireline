@@ -8,7 +8,10 @@ use Fireline\Extract\RequestExtractor;
 use Fireline\Extract\RequestField;
 use Fireline\Normalize\Normalizer;
 use Fireline\Replay\ReplayRecorder;
+use Fireline\Rules\RuleLoader;
 use Fireline\Scoring\Thresholds;
+use Fireline\Telemetry\MetricsStore;
+use Fireline\Telemetry\RuleMetrics;
 
 class WafEngine
 {
@@ -132,6 +135,7 @@ class WafEngine
                 'max_body_length' => $this->config['max_body_length'],
                 'max_value_length' => $this->config['max_value_length'],
             ],
+            'rules' => RuleLoader::metadataFor($this->thresholds->paranoiaLevel()),
         ];
     }
 
@@ -191,6 +195,7 @@ class WafEngine
             'paranoia_level' => 'medium',
             'replay_enabled' => false,
             'replay_path' => dirname(__DIR__, 2) . '/storage/replay/traffic.ndjson',
+            'metrics_path' => null,
             'score_threshold' => null,
             'regex_threshold' => null,
             'safe_cache_threshold' => null,
@@ -241,6 +246,7 @@ class WafEngine
         }
 
         $configs['replay_path'] = (string) ($configs['replay_path'] ?? $this->defaultConfig()['replay_path']);
+        $configs['metrics_path'] = $configs['metrics_path'] === null ? null : (string) $configs['metrics_path'];
 
         return $configs;
     }
@@ -249,6 +255,12 @@ class WafEngine
     {
         if ($this->config['replay_enabled']) {
             (new ReplayRecorder($this->config['replay_path'], $this->replayMetadata()))->record($decision);
+        }
+
+        if ($this->config['metrics_path'] !== null && $this->config['metrics_path'] !== '') {
+            if (MetricsStore::write($this->config['metrics_path'], RuleMetrics::snapshot())) {
+                RuleMetrics::reset();
+            }
         }
 
         return $decision;

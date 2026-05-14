@@ -17,6 +17,7 @@ return [
     'paranoia_level' => 'medium',
     'replay_enabled' => false,
     'replay_path' => dirname(__DIR__) . '/storage/replay/traffic.ndjson',
+    'metrics_path' => null,
     'score_threshold' => null,
     'regex_threshold' => null,
     'safe_cache_threshold' => null,

@@ -41,4 +41,30 @@ class MetricsFormatterTest extends TestCase
 
         $this->assertSame(1, $decoded['counters']['cache.safe.hit']);
     }
+
+    public function testFormatsSnapshotAsSummary(): void
+    {
+        $summary = MetricsFormatter::summary([
+            'counters' => [
+                'cache.safe.hit' => 3,
+                'cache.safe.miss' => 1,
+            ],
+            'cache_hit_ratios' => [
+                'safe' => 0.75,
+            ],
+            'slowest_rules' => [
+                'scanner.aho_corasick' => [
+                    'count' => 2,
+                    'total_ms' => 1.5,
+                    'max_ms' => 1.0,
+                ],
+            ],
+        ]);
+
+        $this->assertStringContainsString('Metrics summary', $summary);
+        $this->assertStringContainsString('Top counters:', $summary);
+        $this->assertStringContainsString('cache.safe.hit: 3', $summary);
+        $this->assertStringContainsString('safe: 0.75', $summary);
+        $this->assertStringContainsString('scanner.aho_corasick: count=2', $summary);
+    }
 }

@@ -16,6 +16,7 @@ use Fireline\Learning\RouteModelExporter;
 use Fireline\Replay\ReplayRunner;
 use Fireline\Telemetry\MetricsFormatter;
 use Fireline\Telemetry\RuleMetrics;
+use Fireline\Telemetry\MetricsStore;
 
 $cli = new Cli();
 
@@ -33,16 +34,35 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  metrics:show | Show in-process metrics snapshot.          |
 +--------------+-------------------------------------------+
-|  example     |  php fire.php replay:run storage/replay/traffic.ndjson |
+|  metrics:export | Export persisted metrics JSON.           |
++--------------+-------------------------------------------+
+|  metrics:reset | Reset persisted metrics snapshot.         |
++--------------+-------------------------------------------+
+|  examples    |  php fire.php replay:run storage/replay/traffic.ndjson |
+|              |  php fire.php replay:run storage/replay/traffic.ndjson --json |
+|              |  php fire.php metrics:show storage/metrics/fireline-metrics.json --summary |
+|              |  php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json |
 +--------------+-------------------------------------------+";
     $cli->getPrinter()->display( $menu );
 });
 
 $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
     $ciMode = CommandArgs::hasFlag($argv, '--ci');
+    $jsonMode = CommandArgs::hasFlag($argv, '--json');
     $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/replay/traffic.ndjson');
 
     $result = (new ReplayRunner())->replay($path);
+
+    if ($jsonMode) {
+        $encoded = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $cli->getPrinter()->display(is_string($encoded) ? $encoded : '{}');
+
+        if ($ciMode && count($result['regressions']) > 0) {
+            exit(1);
+        }
+
+        return;
+    }
 
     $lines = [
         'Replay file: ' . $path,
@@ -51,7 +71,7 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
         'Regressions: ' . count($result['regressions']),
     ];
 
-    if (isset($result['summary']['by_type']) && is_array($result['summary']['by_type'])) {
+    if (isset($result['summary']['by_type']) && is_array($result['summary']['by_type']) && array_sum($result['summary']['by_type']) > 0) {
         $lines[] = 'By type:';
         foreach ($result['summary']['by_type'] as $type => $count) {
             if ($count > 0) {
@@ -76,6 +96,9 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
         $lines[] = 'Previous Blocked: ' . (!empty($regression['previous_blocked']) ? 'yes' : 'no');
         $lines[] = 'Current Blocked: ' . (!empty($regression['current_blocked']) ? 'yes' : 'no');
         $lines[] = 'Metadata Changed: ' . (!empty($regression['metadata_changed']) ? 'yes' : 'no');
+        if (isset($regression['metadata_diff']['changed']) && is_array($regression['metadata_diff']['changed']) && $regression['metadata_diff']['changed'] !== []) {
+            $lines[] = 'Metadata Diff: ' . implode(', ', $regression['metadata_diff']['changed']);
+        }
 
         if (isset($regression['explanation']) && is_array($regression['explanation'])) {
             $lines[] = 'Reason: ' . ($regression['explanation']['reason'] ?? '');
@@ -120,13 +143,59 @@ $cli->registerCommand('config:check', function (array $argv) use ($cli) {
 });
 
 $cli->registerCommand('metrics:show', function (array $argv) use ($cli) {
-    $snapshot = RuleMetrics::snapshot();
+    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/metrics/fireline-metrics.json');
+    $snapshot = CommandArgs::hasFlag($argv, '--live') || !is_readable($path)
+        ? RuleMetrics::snapshot()
+        : MetricsStore::read($path);
 
-    $cli->getPrinter()->display(
-        CommandArgs::hasFlag($argv, '--json')
-            ? MetricsFormatter::json($snapshot)
-            : MetricsFormatter::text($snapshot)
-    );
+    if (CommandArgs::hasFlag($argv, '--json')) {
+        $output = MetricsFormatter::json($snapshot);
+    } elseif (CommandArgs::hasFlag($argv, '--summary')) {
+        $output = MetricsFormatter::summary($snapshot);
+    } else {
+        $output = MetricsFormatter::text($snapshot);
+    }
+
+    $cli->getPrinter()->display($output);
+});
+
+$cli->registerCommand('metrics:export', function (array $argv) use ($cli) {
+    $values = CommandArgs::values($argv, 2);
+    $source = $values[0] ?? __DIR__ . '/storage/metrics/fireline-metrics.json';
+    $destination = $values[1] ?? __DIR__ . '/storage/metrics/fireline-metrics-export.json';
+    $snapshot = CommandArgs::hasFlag($argv, '--live') || !is_readable($source)
+        ? RuleMetrics::snapshot()
+        : MetricsStore::read($source);
+    $snapshot['exported_at'] = date('c');
+    $snapshot['source_path'] = $source;
+    $dir = dirname($destination);
+
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        $cli->getPrinter()->display('Unable to create metrics export directory: ' . $dir);
+        exit(1);
+    }
+
+    if (file_put_contents($destination, MetricsFormatter::json($snapshot) . PHP_EOL, LOCK_EX) === false) {
+        $cli->getPrinter()->display('Unable to export metrics: ' . $destination);
+        exit(1);
+    }
+
+    $cli->getPrinter()->display('Metrics exported: ' . $destination);
+});
+
+$cli->registerCommand('metrics:reset', function (array $argv) use ($cli) {
+    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/metrics/fireline-metrics.json');
+
+    if (CommandArgs::hasFlag($argv, '--live')) {
+        RuleMetrics::reset();
+    }
+
+    if (!MetricsStore::reset($path)) {
+        $cli->getPrinter()->display('Unable to reset metrics file: ' . $path);
+        exit(1);
+    }
+
+    $cli->getPrinter()->display('Metrics reset: ' . $path);
 });
 
 $cli->runCommand($argv);
