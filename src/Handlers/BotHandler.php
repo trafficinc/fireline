@@ -14,7 +14,8 @@ class BotHandler extends AbstractHandler
         if ($filter === "bot") {
 
             $bots = new BOTS();
-            $botSafe = $bots->safe($request['headers']['User-Agent'], $request['configs']);
+            $userAgent = $request['headers']['User-Agent'] ?? '';
+            $botSafe = $bots->safe($userAgent, $request['configs']);
             if (!$botSafe) {
                 $this->handleService($bots->getFound(), $filter, $request['request_method']);
             } else {

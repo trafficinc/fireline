@@ -24,6 +24,20 @@ abstract class BaseFilter
 
     }
 
+    protected function ruleMatches(string $rule, string $value): bool {
+        $matched = @preg_match('/'.$rule.'/i', $value, $matches);
+
+        if ($matched === false) {
+            return true;
+        }
+
+        if (function_exists('preg_last_error') && preg_last_error() !== PREG_NO_ERROR) {
+            return true;
+        }
+
+        return !empty($matches);
+    }
+
     /**
      * Check given string
      *

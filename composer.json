@@ -1,9 +1,60 @@
 {
-    "require-dev": {
-        "psalm/phar": "^3.12"
+  "name": "trafficinc/fireline",
+  "description": "Low-configuration PHP web application firewall request blocker.",
+  "type": "library",
+  "license": "proprietary",
+  "keywords": [
+    "waf",
+    "firewall",
+    "security",
+    "php"
+  ],
+  "support": {
+    "source": "https://github.com/trafficinc/fireline"
+  },
+  "config": {
+    "platform": {
+      "php": "8.1.0"
     },
+    "sort-packages": true
+  },
   "require": {
-    "ext-json": "*",
-    "ext-apache": "*"
+    "php": ">=7.1",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "vimeo/psalm": "^5.26"
+  },
+  "autoload": {
+    "psr-4": {
+      "Filters\\": "src/Filters/",
+      "Handlers\\": "src/Handlers/"
+    },
+    "classmap": [
+      "src/Fireline.php",
+      "src/BaseFilter.php"
+    ],
+    "files": [
+      "src/LogService.php",
+      "helpers.php"
+    ]
+  },
+  "autoload-dev": {
+    "classmap": [
+      "tests/Unit/"
+    ]
+  },
+  "scripts": {
+    "lint": "find . -maxdepth 3 -type f -name '*.php' -not -path './vendor/*' -not -path './backup/*' -exec php -l {} \\;",
+    "smoke": "php tests/smoke.php",
+    "test": "vendor/bin/phpunit"
+  },
+  "archive": {
+    "exclude": [
+      "/backup",
+      "/storage/logs/*.log",
+      "/tests"
+    ]
   }
 }

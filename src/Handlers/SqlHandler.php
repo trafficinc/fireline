@@ -12,21 +12,28 @@ class SqlHandler extends AbstractHandler {
         $sql = new SQL();
         if ($filter === 'sql') {
             $badCharacter = false;
+            $badValue = '';
             foreach ($request['get_request_method'] as $key => $val) {
                 if (!$sql->safe($val,$request['configs'])) {
                     $badCharacter = true;
+                    $badValue = $val;
+                    break;
                 }
             }
 
             // filter POST requests
-            foreach ($request['post_request_method'] as $key => $val) {
-                if (!$sql->safe($val,$request['configs'])) {
-                    $badCharacter = true;
+            if (!$badCharacter) {
+                foreach ($request['post_request_method'] as $key => $val) {
+                    if (!$sql->safe($val,$request['configs'])) {
+                        $badCharacter = true;
+                        $badValue = $val;
+                        break;
+                    }
                 }
             }
 
             if ($badCharacter) {
-                $this->handleService($val, $filter, $request['request_method']);
+                $this->handleService($badValue, $filter, $request['request_method']);
             } else {
                 return parent::handle($filter, $request);
             }

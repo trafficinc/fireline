@@ -25,10 +25,7 @@ class XSS extends BaseFilter
             if (empty($compared) || strpos($compared, '#') === 0){
                 continue;
             }
-            // Regex Firewall Rules.
-            preg_match('/'.$compared.'/i',$value,$matches);
-
-            if (!empty($matches)){
+            if ($this->ruleMatches($compared, $value)){
                 return false;
             }
         }

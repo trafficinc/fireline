@@ -18,10 +18,10 @@ trait LogService {
     protected $log_format = '%m (%i) [%f] [%s] - %v';
 
     /**
-     * Send HTTP status code 400 to client
+     * Send HTTP status code 403 to client
      */
     public function block(){
-        header('HTTP/1.1 400 Bad Request');
+        header('HTTP/1.1 403 Forbidden');
         exit;
     }
 
@@ -29,6 +29,15 @@ trait LogService {
         // log & block
         $this->log($value, $filter, $request);
         $this->block();
+    }
+
+    protected function cleanLogValue(string $value): string {
+        $value = preg_replace('/[\x00-\x1F\x7F]/', ' ', $value);
+        if (strlen($value) > 1000) {
+            $value = substr($value, 0, 1000) . '...';
+        }
+
+        return $value;
     }
 
     /**
@@ -42,9 +51,11 @@ trait LogService {
     public function log(string $value, string $filter, string $request){
         $logFile = dirname(__DIR__) . '/storage/logs/fireline.log';
         if (!empty($logFile) && !empty($this->log_format)) {
+            $value = $this->cleanLogValue($value);
+            $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
             $data = str_replace(
                 array('%f', '%v', '%i', '%s', '%d', '%t', '%m', '%u'),
-                array($filter, $value, $_SERVER['REMOTE_ADDR'], $request, date('Y-m-d'), date('H:i:s'),
+                array($filter, $value, $remoteAddr, $request, date('Y-m-d'), date('H:i:s'),
                     date('Y-m-d H:i:s'), time()),
                 $this->log_format);
             if (is_writable($logFile)){

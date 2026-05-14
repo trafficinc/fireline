@@ -26,10 +26,7 @@ class SQL extends BaseFilter
             {
                 continue;
             }
-            // Regex Firewall Rules.
-            preg_match('/'.$compared.'/i',$value,$matches);
-
-            if (!empty($matches)){
+            if ($this->ruleMatches($compared, $value)){
                 return false;
             }
         }

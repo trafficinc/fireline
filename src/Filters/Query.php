@@ -19,7 +19,7 @@ class Query extends BaseFilter
      */
     public function safe(string $value, array $configs): bool
     {
-        $strict_mode = $configs['strict_mode'];
+        $strict_mode = $configs['strict_mode'] ?? false;
         foreach ($this->compares as $compared)
         {
             $compared = trim($compared);
@@ -31,10 +31,7 @@ class Query extends BaseFilter
                 $value = $this->normalize($value);
             }
 
-            // Regex Firewall Rules.
-            preg_match('/'.$compared.'/i',$value,$matches);
-
-            if (!empty($matches)){
+            if ($this->ruleMatches($compared, $value)){
                 return false;
             }
         }

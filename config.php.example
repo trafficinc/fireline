@@ -1,0 +1,13 @@
+<?php
+
+return [
+    'bypass_firewall' => false,
+    'strict_mode' => false,
+    'ip_by_country' => false,
+    'whitelist' => false,
+    'trusted_proxies' => [],
+    'max_value_length' => 8192,
+    'inspect_json' => true,
+    'inspect_headers' => true,
+    'inspect_raw_body' => true,
+];

@@ -270,9 +270,14 @@ class IP extends BaseFilter
         list ($net, $mask) = preg_split("/[\/]{1}/", $CIDR);
 
         $ip_net = ip2long ($net);
-        $ip_mask = ~((1 << (32 - $mask)) - 1);
-
         $ip_ip = ip2long ($IP);
+        $mask = (int) $mask;
+
+        if ($ip_net === false || $ip_ip === false || $mask < 0 || $mask > 32) {
+            return false;
+        }
+
+        $ip_mask = ~((1 << (32 - $mask)) - 1);
 
         $ip_ip_net = $ip_ip & $ip_mask;
 
@@ -299,6 +304,8 @@ class IP extends BaseFilter
         if ($configs['ip_by_country']) {
             if (file_exists($geoDb) && is_readable($geoDb)) {
                 $reader = new Reader($geoDb);
+            } else {
+                return false;
             }
 //        xdebug_var_dump($reader);
 
