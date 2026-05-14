@@ -40,6 +40,7 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  examples    |  php fire.php replay:run storage/replay/traffic.ndjson |
 |              |  php fire.php replay:run storage/replay/traffic.ndjson --json |
+|              |  php fire.php baseline:build storage/replay/traffic.ndjson 10 --json |
 |              |  php fire.php metrics:show storage/metrics/fireline-metrics.json --summary |
 |              |  php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json |
 +--------------+-------------------------------------------+";
@@ -116,6 +117,12 @@ $cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
     $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/replay/traffic.ndjson');
     $minSamples = CommandArgs::intValue($argv, 3, 3);
     $model = BaselineBuilder::buildFromReplayFile($path, $minSamples);
+
+    if (CommandArgs::hasFlag($argv, '--json')) {
+        $encoded = json_encode($model, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $cli->getPrinter()->display(is_string($encoded) ? $encoded : '{}');
+        return;
+    }
 
     $cli->getPrinter()->display(
         "Replay file: " . $path . PHP_EOL .

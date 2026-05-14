@@ -28,6 +28,7 @@ class CliReplayTest extends TestCase
         $text = implode("\n", $output);
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('replay:run', $text);
+        $this->assertStringContainsString('baseline:build', $text);
         $this->assertStringContainsString('metrics:show', $text);
         $this->assertStringContainsString('metrics:export', $text);
         $this->assertStringContainsString('metrics:reset', $text);
@@ -237,6 +238,21 @@ class CliReplayTest extends TestCase
         $this->assertStringContainsString('rules', $text);
     }
 
+    public function testBaselineBuildCanOutputJson(): void
+    {
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '100')) . PHP_EOL);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '101')) . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '102')) . PHP_EOL, FILE_APPEND);
+
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php baseline:build ' . escapeshellarg($this->path) . ' 3 --json';
+        exec($command, $output, $exitCode);
+
+        $decoded = json_decode(implode("\n", $output), true);
+        $this->assertSame(0, $exitCode);
+        $this->assertIsArray($decoded);
+        $this->assertSame('int', $decoded['/orders']['fields']['get.id']['type']);
+    }
+
     public function testMetricsShowDisplaysSnapshot(): void
     {
         $command = escapeshellarg(PHP_BINARY) . ' fire.php metrics:show';
@@ -381,5 +397,25 @@ class CliReplayTest extends TestCase
                 }
             }
         }
+    }
+
+    protected function replayEvent(string $route, string $field, string $value): array
+    {
+        return [
+            'request' => [
+                'route' => $route,
+            ],
+            'results' => [
+                [
+                    'field' => $field,
+                    'source' => 'get',
+                    'normalized' => $value,
+                ],
+            ],
+            'decision' => [
+                'blocked' => false,
+                'score' => 0,
+            ],
+        ];
     }
 }
