@@ -4,7 +4,7 @@
 
 To install:
 
-Download project, then copy `fireline` __folder__ above web root and copy fireline.php file in `config-webroot` folder to the web root of your web app, in `Laravel`,`CodeIgniter` it is in the `/public` folder. Also, make sure the `fireline` directory is one above the web root:
+Download project, unzip, change name of folder to `fireline`, then copy `fireline` __folder__ above web root and copy fireline.php file in `config-webroot` folder to the web root of your web app, in `Laravel`,`CodeIgniter` it is in the `/public` folder. Also, make sure the `fireline` directory is one above the web root:
 
 ````
 | fireline/
