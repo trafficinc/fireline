@@ -116,7 +116,7 @@ Config options:
 
 ## Architecture
 
-The current engine follows the staged pipeline described in [AGENTS.md](AGENTS.md):
+The current engine follows a staged inspection pipeline:
 
 1. Extract request fields individually.
 2. Normalize each field once.
@@ -140,6 +140,27 @@ Trusted proxy example:
 ```
 
 Leave `trusted_proxies` empty unless the site is behind a reverse proxy or load balancer you control.
+
+## Route Models
+
+Optional route models live in [config/routes.php](config/routes.php). They add anomaly score when a known route receives a field shape that does not match the expected type or length.
+
+```php
+return [
+    '/login' => [
+        'post.username' => [
+            'type' => 'alnum',
+            'max_length' => 64,
+        ],
+        'post.password' => [
+            'type' => 'opaque',
+            'max_length' => 256,
+        ],
+    ],
+];
+```
+
+Supported field types are `alpha`, `alnum`, `int`, `integer`, `numeric`, `email`, `slug`, `url`, `text`, and `opaque`. Route models are scoring signals, not standalone block rules.
 
 ## Rule Files
 
