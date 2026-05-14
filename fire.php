@@ -14,6 +14,8 @@ use Fireline\Config\ConfigChecker;
 use Fireline\Learning\BaselineBuilder;
 use Fireline\Learning\RouteModelExporter;
 use Fireline\Replay\ReplayRunner;
+use Fireline\Telemetry\MetricsFormatter;
+use Fireline\Telemetry\RuleMetrics;
 
 $cli = new Cli();
 
@@ -28,6 +30,8 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 |  baseline:build | Build route model candidates from replay. |
 +--------------+-------------------------------------------+
 |  config:check | Validate Fireline config and writable paths. |
++--------------+-------------------------------------------+
+|  metrics:show | Show in-process metrics snapshot.          |
 +--------------+-------------------------------------------+
 |  example     |  php fire.php replay:run storage/replay/traffic.ndjson |
 +--------------+-------------------------------------------+";
@@ -71,6 +75,7 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
         $lines[] = 'Current Score: ' . ($regression['current_score'] ?? 0);
         $lines[] = 'Previous Blocked: ' . (!empty($regression['previous_blocked']) ? 'yes' : 'no');
         $lines[] = 'Current Blocked: ' . (!empty($regression['current_blocked']) ? 'yes' : 'no');
+        $lines[] = 'Metadata Changed: ' . (!empty($regression['metadata_changed']) ? 'yes' : 'no');
 
         if (isset($regression['explanation']) && is_array($regression['explanation'])) {
             $lines[] = 'Reason: ' . ($regression['explanation']['reason'] ?? '');
@@ -112,6 +117,16 @@ $cli->registerCommand('config:check', function (array $argv) use ($cli) {
     if (!$result['ok']) {
         exit(1);
     }
+});
+
+$cli->registerCommand('metrics:show', function (array $argv) use ($cli) {
+    $snapshot = RuleMetrics::snapshot();
+
+    $cli->getPrinter()->display(
+        CommandArgs::hasFlag($argv, '--json')
+            ? MetricsFormatter::json($snapshot)
+            : MetricsFormatter::text($snapshot)
+    );
 });
 
 $cli->runCommand($argv);

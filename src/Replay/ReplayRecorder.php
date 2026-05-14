@@ -7,10 +7,12 @@ use Fireline\Engine\Decision;
 class ReplayRecorder
 {
     protected $path;
+    protected $metadata;
 
-    public function __construct(string $path)
+    public function __construct(string $path, array $metadata = [])
     {
         $this->path = $path;
+        $this->metadata = $metadata;
     }
 
     public function record(Decision $decision): bool
@@ -23,6 +25,7 @@ class ReplayRecorder
         $event = [
             'version' => 1,
             'recorded_at' => date('c'),
+            'metadata' => $this->metadata,
             'request' => $this->request($context->request()),
             'results' => $this->results($decision->results()),
             'decision' => [

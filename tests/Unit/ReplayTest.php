@@ -56,6 +56,25 @@ class ReplayTest extends TestCase
         $this->assertSame(30, $event['decision']['score']);
     }
 
+    public function testRecorderStoresReplayMetadata(): void
+    {
+        $context = new RequestContext([
+            'route' => '/search',
+        ]);
+
+        $this->assertTrue((new ReplayRecorder($this->path, [
+            'paranoia_level' => 'high',
+            'thresholds' => [
+                'score_threshold' => 18,
+            ],
+        ]))->record(Decision::allow($context)));
+
+        $event = json_decode(trim(file_get_contents($this->path)), true);
+
+        $this->assertSame('high', $event['metadata']['paranoia_level']);
+        $this->assertSame(18, $event['metadata']['thresholds']['score_threshold']);
+    }
+
     public function testRecorderRedactsSensitiveFields(): void
     {
         $context = new RequestContext([
@@ -123,6 +142,62 @@ class ReplayTest extends TestCase
         $this->assertSame(1, $result['summary']['by_type']['new_block']);
         $this->assertSame(1, $result['summary']['by_route']['/search']);
         $this->assertGreaterThanOrEqual(25, $result['regressions'][0]['current_score']);
+    }
+
+    public function testRunnerFlagsMetadataChangesOnRegression(): void
+    {
+        $event = [
+            'metadata' => [
+                'paranoia_level' => 'low',
+                'thresholds' => [
+                    'score_threshold' => 35,
+                    'regex_threshold' => 15,
+                    'safe_cache_threshold' => 2,
+                ],
+                'config' => [
+                    'inspect_json' => true,
+                    'inspect_headers' => true,
+                    'inspect_raw_body' => true,
+                    'max_fields' => 200,
+                    'max_headers' => 100,
+                    'max_header_length' => 8192,
+                    'max_body_length' => 1048576,
+                    'max_value_length' => 8192,
+                ],
+            ],
+            'request' => [
+                'route' => '/search',
+                'method' => 'GET',
+                'uri' => '/search?q=test',
+            ],
+            'results' => [
+                [
+                    'field' => 'get.q',
+                    'source' => 'get',
+                    'value' => '1 union select password from users',
+                    'normalized' => '1 union select password from users',
+                    'score' => 1,
+                    'matches' => [],
+                    'breakdown' => [],
+                ],
+            ],
+            'decision' => [
+                'blocked' => false,
+                'reason' => 'allowed',
+                'score' => 1,
+            ],
+        ];
+        file_put_contents($this->path, json_encode($event) . PHP_EOL);
+
+        $result = (new ReplayRunner(new WafEngine([
+            'replay_enabled' => false,
+            'paranoia_level' => 'medium',
+            'score_threshold' => 25,
+            'regex_threshold' => 10,
+        ])))->replay($this->path);
+
+        $this->assertTrue($result['regressions'][0]['metadata_changed']);
+        $this->assertSame('medium', $result['metadata']['current']['paranoia_level']);
     }
 
     public function testRunnerReportsPreviouslyBlockedTrafficThatIsNowAllowed(): void

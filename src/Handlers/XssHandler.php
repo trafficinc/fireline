@@ -2,7 +2,6 @@
 
 namespace Handlers;
 
-use Filters\XSS;
 use LogService;
 
 class XssHandler extends AbstractHandler
@@ -12,8 +11,7 @@ class XssHandler extends AbstractHandler
     public function handle(string $filter, array $request): ?string
     {
         if ($filter === 'xss') {
-            $xss = new XSS();
-            $badValue = $this->firstUnsafeValue($xss, $request);
+            $badValue = $this->firstUnsafeValue(null, $request);
             if ($badValue !== null) {
                 $this->handleService($badValue, $filter, $request['request_method']);
             } else {

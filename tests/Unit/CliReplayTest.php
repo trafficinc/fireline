@@ -66,4 +66,24 @@ class CliReplayTest extends TestCase
 
         $this->assertSame(1, $exitCode);
     }
+
+    public function testMetricsShowDisplaysSnapshot(): void
+    {
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php metrics:show';
+        exec($command, $output, $exitCode);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Metrics snapshot', implode("\n", $output));
+    }
+
+    public function testMetricsShowCanOutputJson(): void
+    {
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php metrics:show --json';
+        exec($command, $output, $exitCode);
+
+        $this->assertSame(0, $exitCode);
+        $decoded = json_decode(implode("\n", $output), true);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('counters', $decoded);
+    }
 }

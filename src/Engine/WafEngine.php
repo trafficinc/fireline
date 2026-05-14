@@ -113,6 +113,28 @@ class WafEngine
         return (new DecisionEngine($this->thresholds->blockThreshold()))->finalize($context);
     }
 
+    public function replayMetadata(): array
+    {
+        return [
+            'paranoia_level' => $this->thresholds->paranoiaLevel(),
+            'thresholds' => [
+                'score_threshold' => $this->thresholds->blockThreshold(),
+                'regex_threshold' => $this->thresholds->regexThreshold(),
+                'safe_cache_threshold' => $this->thresholds->safeCacheThreshold(),
+            ],
+            'config' => [
+                'inspect_json' => $this->config['inspect_json'],
+                'inspect_headers' => $this->config['inspect_headers'],
+                'inspect_raw_body' => $this->config['inspect_raw_body'],
+                'max_fields' => $this->config['max_fields'],
+                'max_headers' => $this->config['max_headers'],
+                'max_header_length' => $this->config['max_header_length'],
+                'max_body_length' => $this->config['max_body_length'],
+                'max_value_length' => $this->config['max_value_length'],
+            ],
+        ];
+    }
+
     protected function inspectLegacyGuards(array $request, RequestContext $context)
     {
         $ip = new IpGuard();
@@ -226,7 +248,7 @@ class WafEngine
     protected function finalizeDecision(Decision $decision): Decision
     {
         if ($this->config['replay_enabled']) {
-            (new ReplayRecorder($this->config['replay_path']))->record($decision);
+            (new ReplayRecorder($this->config['replay_path'], $this->replayMetadata()))->record($decision);
         }
 
         return $decision;

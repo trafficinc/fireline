@@ -2,7 +2,7 @@
 
 namespace Handlers;
 
-use Filters\BOTS;
+use Fireline\Engine\BotGuard;
 use LogService;
 
 class BotHandler extends AbstractHandler
@@ -13,11 +13,11 @@ class BotHandler extends AbstractHandler
     {
         if ($filter === "bot") {
 
-            $bots = new BOTS();
+            $bots = new BotGuard();
             $userAgent = $request['headers']['User-Agent'] ?? '';
-            $botSafe = $bots->safe($userAgent, $request['configs']);
+            $botSafe = $bots->safe($userAgent);
             if (!$botSafe) {
-                $this->handleService($bots->getFound(), $filter, $request['request_method']);
+                $this->handleService($bots->found(), $filter, $request['request_method']);
             } else {
                 return parent::handle($filter, $request);
             }

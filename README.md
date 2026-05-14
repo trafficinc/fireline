@@ -398,7 +398,14 @@ composer run smoke
 composer run lint
 ```
 
-The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, and `config:check`.
+The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `config:check`, and `metrics:show`.
+
+Show the current in-process metrics snapshot:
+
+```bash
+php fire.php metrics:show
+php fire.php metrics:show --json
+```
 
 ## Troubleshooting
 

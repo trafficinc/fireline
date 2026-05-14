@@ -54,6 +54,9 @@ class ReplayRunner
             'invalid' => $invalid,
             'regressions' => $regressions,
             'summary' => $this->summary($total, $invalid, $regressions),
+            'metadata' => [
+                'current' => $this->engine->replayMetadata(),
+            ],
         ];
     }
 
@@ -64,6 +67,7 @@ class ReplayRunner
         $previousBlocked = (bool) ($previous['blocked'] ?? false);
         $currentScore = $decision->score();
         $currentBlocked = $decision->shouldBlock();
+        $metadataChanged = $this->metadataChanged($event);
 
         if (!$previousBlocked && $currentBlocked) {
             return [
@@ -73,6 +77,7 @@ class ReplayRunner
                 'current_score' => $currentScore,
                 'previous_blocked' => false,
                 'current_blocked' => true,
+                'metadata_changed' => $metadataChanged,
                 'explanation' => $decision->explanation(),
             ];
         }
@@ -86,6 +91,7 @@ class ReplayRunner
                 'previous_blocked' => true,
                 'current_blocked' => false,
                 'previous_reason' => (string) ($previous['reason'] ?? ''),
+                'metadata_changed' => $metadataChanged,
                 'explanation' => $decision->explanation(),
             ];
         }
@@ -98,10 +104,21 @@ class ReplayRunner
                 'current_score' => $currentScore,
                 'previous_blocked' => $previousBlocked,
                 'current_blocked' => $currentBlocked,
+                'metadata_changed' => $metadataChanged,
             ];
         }
 
         return null;
+    }
+
+    protected function metadataChanged(array $event): bool
+    {
+        $previous = $event['metadata'] ?? null;
+        if (!is_array($previous)) {
+            return false;
+        }
+
+        return $previous != $this->engine->replayMetadata();
     }
 
     protected function summary(int $total, int $invalid, array $regressions): array

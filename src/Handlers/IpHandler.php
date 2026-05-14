@@ -1,7 +1,7 @@
 <?php
 
 namespace Handlers;
-use Filters\IP;
+use Fireline\Engine\IpGuard;
 use LogService;
 
 
@@ -11,7 +11,7 @@ class IpHandler extends AbstractHandler
 
     public function handle(string $filter, array $request): ?string{
         if ($filter === 'ip') {
-            $ips = new IP();
+            $ips = new IpGuard();
             $ipSafe = $ips->safe($request['ip'],$request['configs']);
             if (!$ipSafe) {
                 $this->handleService($request['ip'], $filter, $request['request_method']);
