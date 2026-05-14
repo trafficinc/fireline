@@ -19,6 +19,7 @@ class ConfigChecker
             $this->threshold('score_threshold', $config),
             $this->threshold('regex_threshold', $config),
             $this->threshold('safe_cache_threshold', $config),
+            $this->storageDirectory(),
             $this->writablePath('replay_path', (string) ($config['replay_path'] ?? '')),
             $this->writablePath('log_file', $this->logPath()),
             $this->apcu(),
@@ -128,6 +129,24 @@ class ConfigChecker
             'name' => $name,
             'status' => 'error',
             'message' => 'Directory is not writable: ' . $dir,
+        ];
+    }
+
+    protected function storageDirectory(): array
+    {
+        $path = $this->root . '/storage';
+        if (!is_dir($path)) {
+            return [
+                'name' => 'storage_dir',
+                'status' => 'error',
+                'message' => 'Missing storage directory: ' . $path,
+            ];
+        }
+
+        return [
+            'name' => 'storage_dir',
+            'status' => is_writable($path) ? 'ok' : 'error',
+            'message' => is_writable($path) ? $path : 'Directory is not writable: ' . $path,
         ];
     }
 

@@ -110,6 +110,7 @@ Config options:
 - `inspect_json`: inspects JSON request bodies for `application/json` requests.
 - `inspect_headers`: inspects HTTP headers, excluding `Cookie` because cookies are inspected separately.
 - `inspect_raw_body`: inspects raw bodies for non-form and non-JSON content types.
+- Multipart uploads are inspected through metadata fields such as filename, client MIME type, size, and upload error. Fireline does not read uploaded file contents or log temporary upload paths.
 - `paranoia_level`: detection posture. Supported values are `low`, `medium`, `high`, and `strict`.
 - `replay_enabled`: writes normalized replay events when set to `true`.
 - `replay_path`: JSON-lines replay file path.

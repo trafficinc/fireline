@@ -27,4 +27,23 @@ class FieldInspectorTest extends TestCase
         $this->assertContains('SQL_UNION_FROM', array_column($result->toArray()['matches'], 'id'));
         $this->assertArrayHasKey('rule:SQL_UNION_FROM', $result->toArray()['breakdown']);
     }
+
+    public function testInspectsUploadMetadataWithUploadHeuristics(): void
+    {
+        $inspector = new FieldInspector(new Thresholds([
+            'paranoia_level' => 'medium',
+            'regex_threshold' => 10,
+        ]));
+
+        $result = $inspector->inspect(
+            ['method' => 'POST', 'route' => '/upload'],
+            new RequestField('file.avatar.name', 'avatar.php', 'file'),
+            'avatar.php',
+            false
+        );
+
+        $this->assertArrayHasKey('upload_heuristics', $result->toArray()['breakdown']);
+        $this->assertContains('UPLOAD_PHP_EXTENSION', array_column($result->toArray()['matches'], 'id'));
+        $this->assertGreaterThanOrEqual(22, $result->score());
+    }
 }

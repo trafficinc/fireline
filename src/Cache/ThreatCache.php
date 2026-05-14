@@ -7,12 +7,13 @@ use Fireline\Telemetry\RuleMetrics;
 class ThreatCache
 {
     protected static $memory = [];
+    protected static $prefix = 'threat:';
 
     public static function remember(string $fingerprint): void
     {
         RuleMetrics::increment('cache.threat.write');
         if (function_exists('apcu_store')) {
-            apcu_store('threat:' . $fingerprint, true, 600);
+            apcu_store(self::$prefix . $fingerprint, true, 600);
             return;
         }
 
@@ -22,7 +23,7 @@ class ThreatCache
     public static function isKnownThreat(string $fingerprint): bool
     {
         if (function_exists('apcu_fetch')) {
-            $hit = apcu_fetch('threat:' . $fingerprint) === true;
+            $hit = apcu_fetch(self::$prefix . $fingerprint) === true;
             $hit ? RuleMetrics::cacheHit('threat') : RuleMetrics::cacheMiss('threat');
             return $hit;
         }
@@ -31,5 +32,10 @@ class ThreatCache
         $hit ? RuleMetrics::cacheHit('threat') : RuleMetrics::cacheMiss('threat');
 
         return $hit;
+    }
+
+    public static function reset(): void
+    {
+        self::$memory = [];
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use Fireline\Cache\SafeCache;
+use Fireline\Cache\ThreatCache;
 use Fireline\Scan\AhoCorasick;
 use Fireline\Scan\RegexScanner;
 use Fireline\Telemetry\RuleMetrics;
@@ -12,6 +13,8 @@ class RuleMetricsTest extends TestCase
     {
         RuleMetrics::reset();
         RuleMetrics::enable(true);
+        SafeCache::reset();
+        ThreatCache::reset();
         AhoCorasick::reset();
     }
 
@@ -39,6 +42,22 @@ class RuleMetricsTest extends TestCase
         $snapshot = RuleMetrics::snapshot();
 
         $this->assertSame(0.5, $snapshot['cache_hit_ratios']['safe']);
+    }
+
+    public function testTracksThreatCacheMetricsAndReset(): void
+    {
+        $fingerprint = sha1('threat');
+
+        ThreatCache::remember($fingerprint);
+        $this->assertTrue(ThreatCache::isKnownThreat($fingerprint));
+
+        ThreatCache::reset();
+
+        $this->assertFalse(ThreatCache::isKnownThreat($fingerprint));
+        $snapshot = RuleMetrics::snapshot();
+
+        $this->assertSame(1, $snapshot['counters']['cache.threat.write']);
+        $this->assertArrayHasKey('threat', $snapshot['cache_hit_ratios']);
     }
 
     public function testTracksFalsePositiveCounts(): void

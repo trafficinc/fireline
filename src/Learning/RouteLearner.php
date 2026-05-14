@@ -2,6 +2,7 @@
 
 namespace Fireline\Learning;
 
+use Fireline\Cache\RouteModelCache;
 use Fireline\Extract\RequestField;
 use Fireline\Scan\Tokenizer;
 use Fireline\Telemetry\RuleMetrics;
@@ -77,6 +78,7 @@ class RouteLearner
     public static function reset(): void
     {
         self::$models = null;
+        RouteModelCache::reset();
     }
 
     public static function useModels(array $models): void
@@ -86,8 +88,15 @@ class RouteLearner
 
     protected static function modelFor(string $route, string $field): ?array
     {
-        $routes = self::models();
-        $routeModel = $routes[$route] ?? null;
+        $routeModel = RouteModelCache::get($route);
+        if ($routeModel === null) {
+            $routes = self::models();
+            $routeModel = $routes[$route] ?? null;
+            if (is_array($routeModel)) {
+                RouteModelCache::put($route, $routeModel);
+            }
+        }
+
         if (!is_array($routeModel)) {
             return null;
         }

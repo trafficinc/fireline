@@ -86,6 +86,10 @@ class RequestExtractor
             $fields = array_merge($fields, $this->flatten(JsonExtractor::extract($body), 'json', 'json'));
         }
 
+        if (stripos($contentType, 'multipart/form-data') !== false) {
+            $fields = array_merge($fields, $this->flatten(MultipartExtractor::extract($_FILES), 'file', 'file'));
+        }
+
         if ($this->shouldInspectRawBody($contentType, $body)) {
             $fields[] = new RequestField('raw.body', $body, 'raw');
         }

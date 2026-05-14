@@ -91,4 +91,17 @@ class RouteLearnerTest extends TestCase
 
         $this->assertSame(3, $score);
     }
+
+    public function testCachesRouteModelsByRoute(): void
+    {
+        $field = new RequestField('post.username', 'alice', 'post');
+
+        RouteLearner::compare('/login', $field, 'alice');
+        RouteLearner::compare('/login', $field, 'alice');
+
+        $snapshot = RuleMetrics::snapshot();
+
+        $this->assertGreaterThanOrEqual(1, $snapshot['counters']['cache.route_model.write']);
+        $this->assertGreaterThanOrEqual(1, $snapshot['counters']['cache.route_model.hit']);
+    }
 }

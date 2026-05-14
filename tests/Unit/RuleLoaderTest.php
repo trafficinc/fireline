@@ -35,7 +35,9 @@ class RuleLoaderTest extends TestCase
 
         $this->assertContains('SQL_UNION_SELECT', $lowIds);
         $this->assertNotContains('SQL_BOOLEAN_OR', $lowIds);
+        $this->assertNotContains('UPLOAD_PHP_EXTENSION', $lowIds);
         $this->assertContains('SQL_BOOLEAN_OR', $strictIds);
+        $this->assertContains('UPLOAD_PHP_EXTENSION', $strictIds);
         $this->assertGreaterThan(count($lowIds), count($strictIds));
     }
 

@@ -2,7 +2,12 @@
 
 use Fireline\Engine\BotGuard;
 use Fireline\Engine\IpGuard;
+use Fireline\Heuristics\EntropyHeuristics;
+use Fireline\Heuristics\UploadHeuristics;
 use Fireline\Normalize\Normalizer;
+use Fireline\Extract\MultipartExtractor;
+use Fireline\Extract\RequestField;
+use Fireline\Extract\RequestExtractor;
 use Fireline\Scan\AhoCorasick;
 use Fireline\Scan\RegexScanner;
 use Fireline\Scan\Trie;
@@ -71,6 +76,84 @@ class NewPipelineComponentsTest extends TestCase
 
         $this->assertNotContains('XSS_EVENT_HANDLER', array_column($lowMatches, 'id'));
         $this->assertContains('XSS_EVENT_HANDLER', array_column($highMatches, 'id'));
+    }
+
+    public function testEntropyHeuristicsScoreEncodedLookingPayloadsWithoutScoringPlainText(): void
+    {
+        $plain = str_repeat('stainless steel washers ', 8);
+        $encoded = str_repeat('QWxhZGRpbjpvcGVuIHNlc2FtZTEyMzQ1Njc4OTA=', 4);
+
+        $this->assertSame(0, EntropyHeuristics::analyze($plain));
+        $this->assertGreaterThanOrEqual(3, EntropyHeuristics::analyze($encoded));
+        $this->assertGreaterThan(3.0, EntropyHeuristics::shannonEntropy($encoded));
+    }
+
+    public function testMultipartExtractorNormalizesUploadMetadataWithoutTempPaths(): void
+    {
+        $fields = MultipartExtractor::extract([
+            'avatar' => [
+                'name' => 'shell.php',
+                'type' => 'application/x-php',
+                'tmp_name' => '/tmp/php123',
+                'error' => 0,
+                'size' => 512,
+            ],
+        ]);
+
+        $this->assertSame('shell.php', $fields['avatar']['name']);
+        $this->assertSame('application/x-php', $fields['avatar']['type']);
+        $this->assertSame('512', $fields['avatar']['size']);
+        $this->assertArrayNotHasKey('tmp_name', $fields['avatar']);
+    }
+
+    public function testUploadHeuristicsScoreDangerousUploadMetadata(): void
+    {
+        $filename = new RequestField('file.avatar.name', 'avatar.php', 'file');
+        $mime = new RequestField('file.avatar.type', 'application/x-httpd-php', 'file');
+        $normal = new RequestField('post.avatar', 'avatar.php', 'post');
+
+        $this->assertGreaterThanOrEqual(22, UploadHeuristics::analyze($filename, 'avatar.php'));
+        $this->assertSame(18, UploadHeuristics::analyze($mime, 'application/x-httpd-php'));
+        $this->assertSame(0, UploadHeuristics::analyze($normal, 'avatar.php'));
+    }
+
+    public function testRequestExtractorAddsMultipartFileFields(): void
+    {
+        $_SERVER = [
+            'REMOTE_ADDR' => '192.0.2.10',
+            'REQUEST_METHOD' => 'POST',
+            'REQUEST_URI' => '/upload',
+            'HTTP_USER_AGENT' => 'Mozilla/5.0',
+            'CONTENT_TYPE' => 'multipart/form-data; boundary=abc',
+        ];
+        $_GET = [];
+        $_POST = [];
+        $_COOKIE = [];
+        $_FILES = [
+            'avatar' => [
+                'name' => 'shell.php',
+                'type' => 'application/x-php',
+                'tmp_name' => '/tmp/php123',
+                'error' => 0,
+                'size' => 512,
+            ],
+        ];
+
+        $request = (new RequestExtractor([
+            'trusted_proxies' => [],
+            'inspect_headers' => false,
+            'inspect_json' => true,
+            'inspect_raw_body' => true,
+            'max_value_length' => 8192,
+        ]))->capture();
+
+        $fields = [];
+        foreach ($request['fields'] as $field) {
+            $fields[$field->name()] = $field->value();
+        }
+
+        $this->assertSame('shell.php', $fields['file.avatar.name']);
+        $this->assertSame('application/x-php', $fields['file.avatar.type']);
     }
 
     public function testBotGuardBlocksEmptyAndKnownBotUserAgents(): void

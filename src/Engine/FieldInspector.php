@@ -9,6 +9,7 @@ use Fireline\Heuristics\EncodingHeuristics;
 use Fireline\Heuristics\EntropyHeuristics;
 use Fireline\Heuristics\ShellHeuristics;
 use Fireline\Heuristics\SqlHeuristics;
+use Fireline\Heuristics\UploadHeuristics;
 use Fireline\Heuristics\XssHeuristics;
 use Fireline\Learning\RouteLearner;
 use Fireline\Scan\AhoCorasick;
@@ -47,6 +48,7 @@ class FieldInspector
         $score->add('shell_heuristics', ShellHeuristics::analyze($normalized));
         $score->add('encoding_heuristics', EncodingHeuristics::analyze($normalized));
         $score->add('entropy_heuristics', EntropyHeuristics::analyze($normalized));
+        $score->add('upload_heuristics', UploadHeuristics::analyze($field, $normalized));
 
         if ($score->total() >= $this->thresholds->regexThreshold()) {
             $regex = RegexScanner::scanDetailed($normalized, $matches, $this->thresholds->paranoiaLevel());

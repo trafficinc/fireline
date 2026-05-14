@@ -46,4 +46,15 @@ class ConfigCheckerTest extends TestCase
         $this->assertSame('ok', $replayCheck['status']);
         $this->assertStringContainsString('Will create under writable parent', $replayCheck['message']);
     }
+
+    public function testReportsStorageDirectoryStatus(): void
+    {
+        $result = (new ConfigChecker(dirname(__DIR__, 2)))->check();
+
+        $storageCheck = array_values(array_filter($result['checks'], function (array $check): bool {
+            return $check['name'] === 'storage_dir';
+        }))[0];
+
+        $this->assertSame('ok', $storageCheck['status']);
+    }
 }
