@@ -29,6 +29,7 @@ class CliReplayTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('replay:run', $text);
         $this->assertStringContainsString('baseline:build', $text);
+        $this->assertStringContainsString('baseline:export', $text);
         $this->assertStringContainsString('metrics:show', $text);
         $this->assertStringContainsString('metrics:export', $text);
         $this->assertStringContainsString('metrics:reset', $text);
@@ -269,6 +270,47 @@ class CliReplayTest extends TestCase
         $this->assertSame(4, $decoded['total']);
         $this->assertSame(1, $decoded['invalid']);
         $this->assertSame('int', $decoded['model']['/orders']['fields']['get.id']['type']);
+    }
+
+    public function testBaselineExportWritesPhpRouteModel(): void
+    {
+        $destination = sys_get_temp_dir() . '/fireline-routes-' . uniqid('', true) . '.php';
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '100')) . PHP_EOL);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '101')) . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '102')) . PHP_EOL, FILE_APPEND);
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php baseline:export ' . escapeshellarg($this->path) . ' 3 ' . escapeshellarg($destination);
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(0, $exitCode);
+            $this->assertStringContainsString('Route model exported:', implode("\n", $output));
+            $this->assertFileExists($destination);
+
+            $model = require $destination;
+            $this->assertSame('int', $model['/orders']['fields']['get.id']['type']);
+        } finally {
+            if (is_file($destination)) {
+                unlink($destination);
+            }
+        }
+    }
+
+    public function testBaselineExportDryRunDoesNotWriteFile(): void
+    {
+        $destination = sys_get_temp_dir() . '/fireline-routes-' . uniqid('', true) . '.php';
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '100')) . PHP_EOL);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '101')) . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '102')) . PHP_EOL, FILE_APPEND);
+
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php baseline:export ' . escapeshellarg($this->path) . ' 3 ' . escapeshellarg($destination) . ' --dry-run';
+        exec($command, $output, $exitCode);
+
+        $text = implode("\n", $output);
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Route model export preview:', $text);
+        $this->assertStringContainsString('Events read: 3', $text);
+        $this->assertFileDoesNotExist($destination);
     }
 
     public function testMetricsShowDisplaysSnapshot(): void

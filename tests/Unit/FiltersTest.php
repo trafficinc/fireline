@@ -15,6 +15,14 @@ class TestableIPFilter extends IP
     }
 }
 
+class TestableBotFilter extends BOTS
+{
+    public function __construct(array $compares = [])
+    {
+        $this->compares = $compares;
+    }
+}
+
 class FiltersTest extends TestCase
 {
     public function testSqlInjectionPatternsAreBlocked(): void
@@ -64,6 +72,18 @@ class FiltersTest extends TestCase
         $filter = new BOTS();
 
         $this->assertTrue($filter->safe('Mozilla/5.0 AppleWebKit/537.36 Chrome/120 Safari/537.36', []));
+    }
+
+    public function testBotDetectionPreservesFoundValueForCompatibility(): void
+    {
+        $filter = new TestableBotFilter(['^-?$', '^.+(openbot)']);
+
+        $this->assertFalse($filter->safe('Mozilla openbot', []));
+        $this->assertSame('Mozilla openbot', $filter->getFound());
+
+        $filter = new TestableBotFilter(['^-?$']);
+        $this->assertFalse($filter->safe('', []));
+        $this->assertSame('[SystemProduced] Empty User-Agent', $filter->getFound());
     }
 
     public function testQueryFilteringBlocksExploitPatterns(): void

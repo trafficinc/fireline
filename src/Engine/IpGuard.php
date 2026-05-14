@@ -2,6 +2,13 @@
 
 namespace Fireline\Engine;
 
+if (!class_exists('GeoIp2\\Database\\Reader')) {
+    $geoIpPhar = dirname(__DIR__) . '/geoip2.phar';
+    if (is_readable($geoIpPhar)) {
+        require_once $geoIpPhar;
+    }
+}
+
 use GeoIp2\Database\Reader;
 use GeoIp2\Exception\AddressNotFoundException;
 

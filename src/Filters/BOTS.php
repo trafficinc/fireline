@@ -3,6 +3,7 @@
 namespace Filters;
 
 use BaseFilter;
+use Fireline\Engine\BotGuard;
 
 class BOTS extends BaseFilter
 {
@@ -19,17 +20,12 @@ class BOTS extends BaseFilter
      * @return bool
      */
     public function safe(string $value, array $configs): bool {
-        if ($this->unsafeRuleFor($value) === null) {
+        $guard = new BotGuard($this->compares);
+        if ($guard->safe($value)) {
             return true;
         }
 
-        if (empty($value)){
-            // empty User-Agent
-            $this->found  = '[SystemProduced] Empty User-Agent';
-        } else {
-            // save user-agent
-            $this->found  = $value;
-        }
+        $this->found = $guard->found();
 
         return false;
     }

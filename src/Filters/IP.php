@@ -2,11 +2,8 @@
 
 namespace Filters;
 
-require dirname(__DIR__). '/geoip2.phar';
-
 use BaseFilter;
-use GeoIp2\Database\Reader;
-use GeoIp2\Exception\AddressNotFoundException;
+use Fireline\Engine\IpGuard;
 
 class IP extends BaseFilter
 {
@@ -293,69 +290,7 @@ class IP extends BaseFilter
      * @throws \MaxMind\Db\Reader\InvalidDatabaseException
      */
     public function safe(string $value, array $configs): bool {
-        $dirName = dirname(__DIR__);
-        $dirCompares  = $dirName .'/Compares/';
-        $geoDb = $dirName.'/GeoLite2-Country.mmdb';
-        $blockedCountries =  require $dirCompares.$this->ip_block_by_country_file;
-        $whiteList =  require $dirCompares.$this->secondary_compares_file;
-
-
-        // https://www.maxmind.com/en/geoip/downloads
-        if ($configs['ip_by_country']) {
-            if (file_exists($geoDb) && is_readable($geoDb)) {
-                $reader = new Reader($geoDb);
-            } else {
-                return false;
-            }
-//        xdebug_var_dump($reader);
-
-            $record = (object)['isoCode' => ''];
-            try {
-                $record = $reader->country($value);
-            } catch (AddressNotFoundException $e) {
-                //return true;
-            }
-
-            foreach ($this->countries as $cKey => $cValue) {
-                if (in_array($cKey, $blockedCountries) && isset($record) && $cKey === $record->isoCode) {
-                    return false;
-                }
-            }
-        }
-
-        //WhiteList
-        if ($configs['whitelist']) {
-            $okIp = 0;
-            foreach ($whiteList as $whiteListed) {
-                if (strpos($whiteListed,"/")){
-                    // this is an ip range - ex. 192.0.0.0/8, 127.0.0.0/8
-                    if ($this->ipCIDRCheck($value, $whiteListed)){
-                        $okIp += 1;
-                    }
-                } else if ($value === $whiteListed) {
-                    $okIp += 1;
-                }
-            }
-            if ($okIp > 0){
-                return true;
-            } else {
-                return false;
-            }
-        }
-        //unset($whiteList);
-        // BlackList
-        foreach ($this->compares as $compared) {
-            $compared = trim($compared);
-            if (empty($compared) || strpos($compared, '#') === 0) {
-                continue;
-            }
-
-            if ($compared == $value || stripos($value, $compared) !== false) {
-                return false;
-            }
-        }
-       // xdebug_print_function_stack( 'safe function' );
-        return true;
+        return (new IpGuard($this->compares))->safe($value, $configs);
     }
 
 }

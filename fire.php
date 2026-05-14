@@ -30,6 +30,8 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  baseline:build | Build route model candidates from replay. |
 +--------------+-------------------------------------------+
+|  baseline:export | Write route model candidates to a file.  |
++--------------+-------------------------------------------+
 |  config:check | Validate Fireline config and writable paths. |
 +--------------+-------------------------------------------+
 |  metrics:show | Show in-process metrics snapshot.          |
@@ -42,6 +44,8 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 |              |  php fire.php replay:run storage/replay/traffic.ndjson --json |
 |              |  php fire.php baseline:build storage/replay/traffic.ndjson 10 --json |
 |              |  php fire.php baseline:build storage/replay/traffic.ndjson 10 --json --report |
+|              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php |
+|              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --dry-run |
 |              |  php fire.php metrics:show storage/metrics/fireline-metrics.json --summary |
 |              |  php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json |
 +--------------+-------------------------------------------+";
@@ -135,6 +139,39 @@ $cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
         "Route model:" . PHP_EOL .
         RouteModelExporter::toPhp($model)
     );
+});
+
+$cli->registerCommand('baseline:export', function (array $argv) use ($cli) {
+    $values = CommandArgs::values($argv, 2);
+    $path = $values[0] ?? __DIR__ . '/storage/replay/traffic.ndjson';
+    $minSamples = max(1, (int) ($values[1] ?? 3));
+    $destination = $values[2] ?? __DIR__ . '/storage/models/routes.generated.php';
+    $report = BaselineBuilder::buildReportFromReplayFile($path, $minSamples);
+    $dir = dirname($destination);
+    $lines = [
+        (CommandArgs::hasFlag($argv, '--dry-run') ? 'Route model export preview: ' : 'Route model exported: ') . $destination,
+        'Replay file: ' . $path,
+        'Events read: ' . $report['total'],
+        'Invalid lines: ' . $report['invalid'],
+        'Minimum samples: ' . $minSamples,
+    ];
+
+    if (CommandArgs::hasFlag($argv, '--dry-run')) {
+        $cli->getPrinter()->display(implode(PHP_EOL, $lines));
+        return;
+    }
+
+    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+        $cli->getPrinter()->display('Unable to create route model directory: ' . $dir);
+        exit(1);
+    }
+
+    if (file_put_contents($destination, RouteModelExporter::toPhp($report['model']), LOCK_EX) === false) {
+        $cli->getPrinter()->display('Unable to export route model: ' . $destination);
+        exit(1);
+    }
+
+    $cli->getPrinter()->display(implode(PHP_EOL, $lines));
 });
 
 $cli->registerCommand('config:check', function (array $argv) use ($cli) {

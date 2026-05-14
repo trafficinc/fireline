@@ -145,6 +145,10 @@ The current engine follows a staged inspection pipeline:
 
 The public `FireLine` class remains available for existing integrations, but internally delegates to `Fireline\Engine\WafEngine`.
 
+### Legacy Compatibility
+
+The historical `Filters\*` and `Handlers\*` classes remain available for older integrations. They are compatibility wrappers; new integrations should use `FireLine` or `Fireline\Engine\WafEngine`. Compatibility filters for SQL, XSS, query, bot, and IP checks now delegate to the staged engine or guard classes so behavior stays aligned with the current request pipeline.
+
 Trusted proxy example:
 
 ```php
@@ -277,9 +281,12 @@ Build route model candidates from replay data:
 php fire.php baseline:build storage/replay/traffic.ndjson 10
 php fire.php baseline:build storage/replay/traffic.ndjson 10 --json
 php fire.php baseline:build storage/replay/traffic.ndjson 10 --json --report
+php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php
+php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --dry-run
 ```
 
 `baseline:build` prints a PHP `config/routes.php` fragment for review by default. Use `--json` when automation needs the candidate model directly, or `--json --report` when it also needs replay read counts and invalid-line counts.
+Use `baseline:export` to write the reviewed candidate model to a target PHP file. Add `--dry-run` to preview the destination and replay counts without writing.
 
 Validate configuration and writable paths:
 
@@ -424,7 +431,7 @@ composer run smoke
 composer run lint
 ```
 
-The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `config:check`, `metrics:show`, `metrics:export`, and `metrics:reset`.
+The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `baseline:export`, `config:check`, `metrics:show`, `metrics:export`, and `metrics:reset`.
 
 Show the current in-process metrics snapshot:
 
