@@ -1,6 +1,7 @@
 <?php
 
 use Handlers\BotHandler;
+use Handlers\Handler;
 use Handlers\QueryHandler;
 use Handlers\SqlHandler;
 use Handlers\XssHandler;
@@ -40,6 +41,25 @@ class RecordingQueryHandler extends QueryHandler
 class RecordingBotHandler extends BotHandler
 {
     use RecordsBlockedRequests;
+}
+
+class RecordingTerminalHandler implements Handler
+{
+    public $handledFilter = null;
+    public $handledRequest = null;
+
+    public function setNext(Handler $handler): Handler
+    {
+        return $handler;
+    }
+
+    public function handle(string $type, array $request): ?string
+    {
+        $this->handledFilter = $type;
+        $this->handledRequest = $request;
+
+        return 'forwarded';
+    }
 }
 
 class HandlersTest extends TestCase
@@ -87,6 +107,23 @@ class HandlersTest extends TestCase
         $this->assertFalse($handler->blocked);
     }
 
+    public function testSqlHandlerForwardsBenignRequestsToNextHandler(): void
+    {
+        $handler = new RecordingSqlHandler();
+        $terminal = new RecordingTerminalHandler();
+        $handler->setNext($terminal);
+        $request = $this->request([
+            'get_request_method' => ['get.q' => 'stainless steel washers'],
+        ]);
+
+        $result = $handler->handle('sql', $request);
+
+        $this->assertSame('forwarded', $result);
+        $this->assertFalse($handler->blocked);
+        $this->assertSame('sql', $terminal->handledFilter);
+        $this->assertSame($request, $terminal->handledRequest);
+    }
+
     public function testXssHandlerBlocksMaliciousPostValue(): void
     {
         $handler = new RecordingXssHandler();
@@ -109,6 +146,23 @@ class HandlersTest extends TestCase
         ]));
 
         $this->assertFalse($handler->blocked);
+    }
+
+    public function testXssHandlerForwardsBenignRequestsToNextHandler(): void
+    {
+        $handler = new RecordingXssHandler();
+        $terminal = new RecordingTerminalHandler();
+        $handler->setNext($terminal);
+        $request = $this->request([
+            'get_request_method' => ['get.q' => 'price is < 10 and quantity > 2'],
+        ]);
+
+        $result = $handler->handle('xss', $request);
+
+        $this->assertSame('forwarded', $result);
+        $this->assertFalse($handler->blocked);
+        $this->assertSame('xss', $terminal->handledFilter);
+        $this->assertSame($request, $terminal->handledRequest);
     }
 
     public function testQueryHandlerBlocksMaliciousQueryString(): void

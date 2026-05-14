@@ -38,6 +38,25 @@ abstract class BaseFilter
         return !empty($matches);
     }
 
+    protected function shouldSkipRule(string $rule): bool {
+        return empty($rule) || strpos($rule, '#') === 0;
+    }
+
+    protected function unsafeRuleFor(string $value): ?string {
+        foreach ($this->compares as $compared) {
+            $compared = trim($compared);
+            if ($this->shouldSkipRule($compared)) {
+                continue;
+            }
+
+            if ($this->ruleMatches($compared, $value)) {
+                return $compared;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Check given string
      *
@@ -45,5 +64,8 @@ abstract class BaseFilter
      * @param array $configs
      * @return bool
      */
-    abstract public function safe(string $value, array $configs): bool;
+    public function safe(string $value, array $configs): bool
+    {
+        return $this->unsafeRuleFor($value) === null;
+    }
 }

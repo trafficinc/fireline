@@ -20,22 +20,12 @@ class Query extends BaseFilter
     public function safe(string $value, array $configs): bool
     {
         $strict_mode = $configs['strict_mode'] ?? false;
-        foreach ($this->compares as $compared)
-        {
-            $compared = trim($compared);
-            if (empty($compared) || strpos($compared, '#') === 0){
-                continue;
-            }
 
-            if ($strict_mode) {
-                $value = $this->normalize($value);
-            }
-
-            if ($this->ruleMatches($compared, $value)){
-                return false;
-            }
+        if ($strict_mode) {
+            $value = $this->normalize($value);
         }
-        return true;
+
+        return parent::safe($value, $configs);
     }
 
     private function normalize($string){

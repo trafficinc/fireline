@@ -3,19 +3,6 @@
 require __DIR__ . '/../autoload.php';
 require __DIR__ . '/../helpers.php';
 
-class FirelineSmokeTest extends FireLine
-{
-    public function flatten(array $values, string $prefix = ''): array
-    {
-        return $this->flattenRequestValues($values, $prefix);
-    }
-
-    public function headers(array $headers): array
-    {
-        return $this->getHeaderRequestValues($headers);
-    }
-}
-
 function assertSameValue($expected, $actual, string $message): void
 {
     if ($expected !== $actual) {
@@ -34,15 +21,42 @@ function assertFalseValue(bool $actual, string $message): void
     assertSameValue(false, $actual, $message);
 }
 
+function fieldMap(array $fields): array
+{
+    $map = [];
+    foreach ($fields as $field) {
+        $map[$field->name()] = $field->value();
+    }
+
+    return $map;
+}
+
 $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
 $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.1';
 assertSameValue('203.0.113.10', get_ip([]), 'untrusted proxy headers are ignored');
 assertSameValue('198.51.100.1', get_ip(['203.0.113.10']), 'trusted proxy headers are accepted');
 
-$fireline = new FirelineSmokeTest(['max_value_length' => 10]);
-assertSameValue(['json.a.b' => '<script>'], $fireline->flatten(['a' => ['b' => '<script>']], 'json'), 'nested values are flattened');
-assertSameValue(['body' => '0123456789'], $fireline->flatten(['body' => '0123456789abc'], ''), 'values are length capped');
-assertSameValue(['User-Agent' => 'curl'], $fireline->headers(['User-Agent' => 'curl', 'Cookie' => 'a=b']), 'cookie header is excluded from header scanning');
+$_GET = ['a' => ['b' => '<script>'], 'body' => '0123456789abc'];
+$_POST = [];
+$_COOKIE = [];
+$_SERVER['HTTP_USER_AGENT'] = 'curl';
+$_SERVER['HTTP_COOKIE'] = 'a=b';
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['REQUEST_URI'] = '/';
+
+$extractor = new Fireline\Extract\RequestExtractor([
+    'trusted_proxies' => [],
+    'max_value_length' => 10,
+    'inspect_json' => true,
+    'inspect_headers' => true,
+    'inspect_raw_body' => true,
+]);
+$fields = fieldMap($extractor->extractFields($extractor->capture()));
+
+assertSameValue('<script>', $fields['get.a.b'], 'nested values are flattened');
+assertSameValue('0123456789', $fields['get.body'], 'values are length capped');
+assertSameValue('curl', $fields['header.User-Agent'], 'user-agent header is inspected');
+assertSameValue(false, array_key_exists('header.Cookie', $fields), 'cookie header is excluded from header scanning');
 
 $query = new Filters\Query();
 assertTrueValue($query->safe('asset=app.js', []), 'normal js asset query passes');

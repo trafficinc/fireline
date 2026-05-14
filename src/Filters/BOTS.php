@@ -19,26 +19,19 @@ class BOTS extends BaseFilter
      * @return bool
      */
     public function safe(string $value, array $configs): bool {
-
-        foreach ($this->compares as $compared)
-        {
-            $compared = trim($compared);
-            if (empty($compared) || strpos($compared, '#') === 0){
-                continue;
-            }
-            if ($this->ruleMatches($compared, $value)){
-
-                if (empty($value)){
-                    // empty User-Agent
-                    $this->found  = '[SystemProduced] Empty User-Agent';
-                } else {
-                    // save user-agent
-                    $this->found  = $value;
-                }
-                return false;
-            }
+        if ($this->unsafeRuleFor($value) === null) {
+            return true;
         }
-        return true;
+
+        if (empty($value)){
+            // empty User-Agent
+            $this->found  = '[SystemProduced] Empty User-Agent';
+        } else {
+            // save user-agent
+            $this->found  = $value;
+        }
+
+        return false;
     }
 
     public function getFound(): string {

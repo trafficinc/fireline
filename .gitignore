@@ -1,6 +1,6 @@
 vendor/
-composer.phar
-tests.txt
+*.phar
 .idea/
 backup/
-notes.txt
+*s.txt
+*S.md

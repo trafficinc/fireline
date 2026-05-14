@@ -1,0 +1,60 @@
+<?php
+
+use Fireline\Cache\SafeCache;
+use Fireline\Scan\AhoCorasick;
+use Fireline\Scan\RegexScanner;
+use Fireline\Telemetry\RuleMetrics;
+use PHPUnit\Framework\TestCase;
+
+class RuleMetricsTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        RuleMetrics::reset();
+        RuleMetrics::enable(true);
+        AhoCorasick::reset();
+    }
+
+    public function testTracksRuleExecutionCountsAndTimings(): void
+    {
+        $matches = AhoCorasick::scan('1 union select password from users');
+        RegexScanner::scan('1 union select password from users', $matches);
+
+        $snapshot = RuleMetrics::snapshot();
+
+        $this->assertGreaterThan(0, $snapshot['counters']['rule.SQL_UNION_SELECT.matched'] ?? 0);
+        $this->assertGreaterThan(0, $snapshot['counters']['rule.SQL_UNION_FROM.executed'] ?? 0);
+        $this->assertArrayHasKey('rule.SQL_UNION_FROM', $snapshot['timings']);
+        $this->assertArrayHasKey('scanner.aho_corasick', $snapshot['timings']);
+    }
+
+    public function testTracksCacheHitRatios(): void
+    {
+        $fingerprint = sha1('safe');
+
+        $this->assertFalse(SafeCache::isKnownSafe($fingerprint));
+        SafeCache::remember($fingerprint);
+        $this->assertTrue(SafeCache::isKnownSafe($fingerprint));
+
+        $snapshot = RuleMetrics::snapshot();
+
+        $this->assertSame(0.5, $snapshot['cache_hit_ratios']['safe']);
+    }
+
+    public function testTracksFalsePositiveCounts(): void
+    {
+        RuleMetrics::falsePositive('SQL_UNION_SELECT');
+
+        $snapshot = RuleMetrics::snapshot();
+
+        $this->assertSame(1, $snapshot['counters']['rule.SQL_UNION_SELECT.false_positive']);
+    }
+
+    public function testCanDisableMetrics(): void
+    {
+        RuleMetrics::enable(false);
+        RuleMetrics::increment('rule.TEST.executed');
+
+        $this->assertSame([], RuleMetrics::snapshot()['counters']);
+    }
+}

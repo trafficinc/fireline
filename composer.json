@@ -28,6 +28,7 @@
   },
   "autoload": {
     "psr-4": {
+      "Fireline\\": "src/",
       "Filters\\": "src/Filters/",
       "Handlers\\": "src/Handlers/"
     },

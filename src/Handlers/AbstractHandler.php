@@ -24,4 +24,17 @@ abstract class AbstractHandler implements Handler
 
         return null;
     }
+
+    protected function firstUnsafeValue($filter, array $request): ?string
+    {
+        foreach (['get_request_method', 'post_request_method'] as $requestKey) {
+            foreach ($request[$requestKey] as $value) {
+                if (!$filter->safe($value, $request['configs'])) {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
+    }
 }
