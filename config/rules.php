@@ -1,5 +1,16 @@
 <?php
 
+/*
+ * Rule paranoia levels:
+ *
+ * low    - highest-confidence rules for apps with low false-positive tolerance
+ * medium - default balanced rules
+ * high   - more aggressive rules for apps that can tolerate more review/blocking
+ * strict - most aggressive rules and edge-case probes
+ *
+ * Fireline runs rules at or below the configured paranoia_level.
+ */
+
 return [
     [
         'id' => 'SQL_UNION_SELECT',

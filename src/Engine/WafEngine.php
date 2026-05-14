@@ -2,29 +2,19 @@
 
 namespace Fireline\Engine;
 
-use Fireline\Cache\FingerprintCache;
 use Fireline\Cache\SafeCache;
 use Fireline\Cache\ThreatCache;
 use Fireline\Extract\RequestExtractor;
 use Fireline\Extract\RequestField;
-use Fireline\Heuristics\EncodingHeuristics;
-use Fireline\Heuristics\EntropyHeuristics;
-use Fireline\Heuristics\ShellHeuristics;
-use Fireline\Heuristics\SqlHeuristics;
-use Fireline\Heuristics\XssHeuristics;
-use Fireline\Learning\RouteLearner;
 use Fireline\Normalize\Normalizer;
 use Fireline\Replay\ReplayRecorder;
-use Fireline\Scan\AhoCorasick;
-use Fireline\Scan\Prefilter;
-use Fireline\Scan\RegexScanner;
-use Fireline\Scoring\ScoreAccumulator;
 use Fireline\Scoring\Thresholds;
 
 class WafEngine
 {
     protected $config;
     protected $extractor;
+    protected $fieldInspector;
     protected $normalizer;
     protected $thresholds;
 
@@ -35,6 +25,7 @@ class WafEngine
         $this->extractor = new RequestExtractor($this->config);
         $this->normalizer = new Normalizer();
         $this->thresholds = new Thresholds($this->config);
+        $this->fieldInspector = new FieldInspector($this->thresholds);
     }
 
     public function inspectCurrentRequest(): Decision
@@ -52,7 +43,7 @@ class WafEngine
         }
 
         foreach ($this->extractor->extractFields($request) as $field) {
-            $result = $this->inspectField($request, $field, $this->normalizer->run($field->value()), true);
+            $result = $this->fieldInspector->inspect($request, $field, $this->normalizer->run($field->value()), true);
             if ($result === null) {
                 continue;
             }
@@ -100,7 +91,7 @@ class WafEngine
                 (string) ($stored['source'] ?? 'replay')
             );
 
-            $result = $this->inspectField($request, $field, (string) ($stored['normalized'] ?? ''), false);
+            $result = $this->fieldInspector->inspect($request, $field, (string) ($stored['normalized'] ?? ''), false);
             if ($result === null) {
                 continue;
             }
@@ -109,46 +100,6 @@ class WafEngine
         }
 
         return (new DecisionEngine($this->thresholds->blockThreshold()))->finalize($context);
-    }
-
-    protected function inspectField(array $request, RequestField $field, string $normalized, bool $useSafeCache): ?ScanResult
-    {
-        $fingerprint = FingerprintCache::build($request, $field, $normalized);
-
-        if ($useSafeCache && SafeCache::isKnownSafe($fingerprint)) {
-            return null;
-        }
-
-        $score = new ScoreAccumulator();
-        $score->add('prefilter', Prefilter::analyze($normalized));
-
-        $matches = AhoCorasick::scan($normalized, $this->thresholds->paranoiaLevel());
-        foreach ($matches as $match) {
-            $score->addRule($match);
-        }
-
-        $score->add('sql_heuristics', SqlHeuristics::analyze($normalized));
-        $score->add('xss_heuristics', XssHeuristics::analyze($normalized));
-        $score->add('shell_heuristics', ShellHeuristics::analyze($normalized));
-        $score->add('encoding_heuristics', EncodingHeuristics::analyze($normalized));
-        $score->add('entropy_heuristics', EntropyHeuristics::analyze($normalized));
-
-        if ($score->total() >= $this->thresholds->regexThreshold()) {
-            $score->add('regex', RegexScanner::scan($normalized, $matches, $this->thresholds->paranoiaLevel()));
-        }
-
-        $score->add('route_model', RouteLearner::compare((string) ($request['route'] ?? ''), $field, $normalized));
-
-        return new ScanResult(
-            $field->name(),
-            $field->source(),
-            $score->total(),
-            $matches,
-            $score->breakdown(),
-            $fingerprint,
-            $field->value(),
-            $normalized
-        );
     }
 
     protected function inspectLegacyGuards(array $request, RequestContext $context)

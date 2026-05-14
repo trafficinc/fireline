@@ -10,7 +10,13 @@ class RegexScanner
 {
     public static function scan(string $input, array $matches, string $paranoia = 'strict'): int
     {
+        return self::scanDetailed($input, $matches, $paranoia)['score'];
+    }
+
+    public static function scanDetailed(string $input, array $matches, string $paranoia = 'strict'): array
+    {
         $score = 0;
+        $regexMatches = [];
         $matchedRuleKeys = [];
         foreach ($matches as $match) {
             $matchedRuleKeys[] = (string) ($match['id'] ?? '');
@@ -31,10 +37,14 @@ class RegexScanner
             if ($matched === 1 && preg_last_error() === PREG_NO_ERROR) {
                 RuleMetrics::increment('rule.' . $rule->id() . '.matched');
                 $score += $rule->score();
+                $regexMatches[] = $rule->toArray();
             }
         }
 
-        return $score;
+        return [
+            'score' => $score,
+            'matches' => $regexMatches,
+        ];
     }
 
     protected static function requirementsMet(Rule $rule, array $keywords): bool

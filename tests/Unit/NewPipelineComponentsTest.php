@@ -31,6 +31,17 @@ class NewPipelineComponentsTest extends TestCase
         $this->assertGreaterThan(0, RegexScanner::scan('1 union select password from users', $matches));
     }
 
+    public function testRegexScannerReturnsMatchedRuleMetadataForExplainability(): void
+    {
+        AhoCorasick::reset();
+        $matches = AhoCorasick::scan('1 union select password from users');
+
+        $result = RegexScanner::scanDetailed('1 union select password from users', $matches);
+
+        $this->assertGreaterThan(0, $result['score']);
+        $this->assertContains('SQL_UNION_FROM', array_column($result['matches'], 'id'));
+    }
+
     public function testTrieReturnsPayloadsAndSuppressesDuplicateRules(): void
     {
         $trie = new Trie();
