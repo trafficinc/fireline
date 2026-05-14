@@ -32,6 +32,31 @@ class BaselineBuilderTest extends TestCase
         $this->assertSame([], BaselineBuilder::build($events, 3));
     }
 
+    public function testSkipsRedactedAndLimitResults(): void
+    {
+        $events = [
+            $this->event('/login', 'post.password', '[redacted]', false, ['redacted' => true]),
+            $this->event('/login', 'post.password', '[redacted]', false, ['redacted' => true]),
+            $this->event('/login', 'post.password', '[redacted]', false, ['redacted' => true]),
+            $this->event('/upload', 'request', '', false, ['source' => 'limit']),
+            $this->event('/upload', 'request', '', false, ['source' => 'limit']),
+            $this->event('/upload', 'request', '', false, ['source' => 'limit']),
+        ];
+
+        $this->assertSame([], BaselineBuilder::build($events, 3));
+    }
+
+    public function testSkipsLiteralRedactedValuesEvenWithoutFlag(): void
+    {
+        $events = [
+            $this->event('/login', 'post.token', '[redacted]', false),
+            $this->event('/login', 'post.token', '[redacted]', false),
+            $this->event('/login', 'post.token', '[redacted]', false),
+        ];
+
+        $this->assertSame([], BaselineBuilder::build($events, 3));
+    }
+
     public function testBuildsFromReplayFile(): void
     {
         $path = sys_get_temp_dir() . '/fireline-baseline-' . uniqid('', true) . '.ndjson';
@@ -78,17 +103,18 @@ class BaselineBuilderTest extends TestCase
         $this->assertStringContainsString("'type' => 'alnum'", $php);
     }
 
-    protected function event(string $route, string $field, string $value, bool $blocked): array
+    protected function event(string $route, string $field, string $value, bool $blocked, array $resultOverrides = []): array
     {
         return [
             'request' => [
                 'route' => $route,
             ],
             'results' => [
-                [
+                array_merge([
                     'field' => $field,
+                    'source' => 'get',
                     'normalized' => $value,
-                ],
+                ], $resultOverrides),
             ],
             'decision' => [
                 'blocked' => $blocked,

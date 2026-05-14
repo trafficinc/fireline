@@ -4,6 +4,7 @@ namespace Fireline\Engine;
 
 use Fireline\Cache\FingerprintCache;
 use Fireline\Cache\SafeCache;
+use Fireline\Cache\ThreatCache;
 use Fireline\Extract\RequestField;
 use Fireline\Heuristics\EncodingHeuristics;
 use Fireline\Heuristics\EntropyHeuristics;
@@ -30,6 +31,24 @@ class FieldInspector
     public function inspect(array $request, RequestField $field, string $normalized, bool $useSafeCache): ?ScanResult
     {
         $fingerprint = FingerprintCache::build($request, $field, $normalized);
+
+        if ($useSafeCache && ThreatCache::isKnownThreat($fingerprint)) {
+            return new ScanResult(
+                $field->name(),
+                $field->source(),
+                $this->thresholds->blockThreshold(),
+                [[
+                    'id' => 'THREAT_CACHE_HIT',
+                    'type' => 'cache',
+                    'score' => $this->thresholds->blockThreshold(),
+                    'category' => 'cache',
+                ]],
+                ['threat_cache' => $this->thresholds->blockThreshold()],
+                $fingerprint,
+                $field->value(),
+                $normalized
+            );
+        }
 
         if ($useSafeCache && SafeCache::isKnownSafe($fingerprint)) {
             return null;

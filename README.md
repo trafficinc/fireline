@@ -134,7 +134,7 @@ The current engine follows a staged inspection pipeline:
 2. Reject requests that exceed configured limits or contain malformed encoding.
 3. Normalize each field once.
 4. Build a route/field/shape fingerprint.
-5. Check short-lived safe cache.
+5. Check short-lived safe and threat caches.
 6. Run cheap prefilters and heuristics.
 7. Run keyword scanning.
 8. Run regex rules only after suspicious signals.

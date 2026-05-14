@@ -1,5 +1,7 @@
 <?php
 
+use Fireline\Cache\SafeCache;
+use Fireline\Cache\ThreatCache;
 use Fireline\Engine\WafEngine;
 use PHPUnit\Framework\TestCase;
 
@@ -16,6 +18,8 @@ class WafEngineTest extends TestCase
         $_GET = [];
         $_POST = [];
         $_COOKIE = [];
+        SafeCache::reset();
+        ThreatCache::reset();
     }
 
     protected function tearDown(): void
@@ -45,6 +49,33 @@ class WafEngineTest extends TestCase
         $this->assertSame('get.id', $decision->matchedResult()['field']);
         $this->assertSame('get', $decision->matchedResult()['source']);
         $this->assertGreaterThanOrEqual(25, $decision->matchedResult()['score']);
+    }
+
+    public function testRepeatedThreatFingerprintBlocksFromCache(): void
+    {
+        $_GET['id'] = '1 union select password from users';
+        (new WafEngine())->inspectCurrentRequest();
+
+        $decision = (new WafEngine())->inspectCurrentRequest();
+
+        $this->assertTrue($decision->shouldBlock());
+        $this->assertSame('field_score_threshold', $decision->reason());
+        $this->assertSame(['threat_cache' => 25], $decision->matchedResult()['breakdown']);
+        $this->assertSame('THREAT_CACHE_HIT', $decision->matchedResult()['matches'][0]['id']);
+    }
+
+    public function testSafeCacheDoesNotHideThreatGrammarWithSameTextShape(): void
+    {
+        $_GET['q'] = 'stainless steel washer product catalog';
+        $allowed = (new WafEngine())->inspectCurrentRequest();
+        $this->assertFalse($allowed->shouldBlock());
+
+        $_GET['q'] = 'union select password from users';
+        $decision = (new WafEngine())->inspectCurrentRequest();
+
+        $this->assertTrue($decision->shouldBlock());
+        $this->assertNotSame([], $decision->matchedResult());
+        $this->assertNotSame(['threat_cache' => 25], $decision->matchedResult()['breakdown']);
     }
 
     public function testBlocksXssRequest(): void

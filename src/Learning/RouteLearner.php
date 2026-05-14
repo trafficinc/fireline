@@ -84,6 +84,7 @@ class RouteLearner
     public static function useModels(array $models): void
     {
         self::$models = $models;
+        RouteModelCache::reset();
     }
 
     protected static function modelFor(string $route, string $field): ?array

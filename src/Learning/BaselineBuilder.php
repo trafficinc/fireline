@@ -23,9 +23,13 @@ class BaselineBuilder
                     continue;
                 }
 
+                if ((bool) ($result['redacted'] ?? false) || (string) ($result['source'] ?? '') === 'limit') {
+                    continue;
+                }
+
                 $field = (string) ($result['field'] ?? '');
                 $value = (string) ($result['normalized'] ?? '');
-                if ($field === '') {
+                if ($field === '' || $value === '' || $value === '[redacted]') {
                     continue;
                 }
 

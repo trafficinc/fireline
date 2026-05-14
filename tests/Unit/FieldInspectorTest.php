@@ -1,5 +1,8 @@
 <?php
 
+use Fireline\Cache\FingerprintCache;
+use Fireline\Cache\SafeCache;
+use Fireline\Cache\ThreatCache;
 use Fireline\Engine\FieldInspector;
 use Fireline\Extract\RequestField;
 use Fireline\Scoring\Thresholds;
@@ -7,6 +10,12 @@ use PHPUnit\Framework\TestCase;
 
 class FieldInspectorTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        SafeCache::reset();
+        ThreatCache::reset();
+    }
+
     public function testInspectsFieldAndReturnsScanResult(): void
     {
         $inspector = new FieldInspector(new Thresholds([
@@ -45,5 +54,46 @@ class FieldInspectorTest extends TestCase
         $this->assertArrayHasKey('upload_heuristics', $result->toArray()['breakdown']);
         $this->assertContains('UPLOAD_PHP_EXTENSION', array_column($result->toArray()['matches'], 'id'));
         $this->assertGreaterThanOrEqual(22, $result->score());
+    }
+
+    public function testKnownThreatFingerprintShortCircuitsInspection(): void
+    {
+        $request = ['method' => 'GET', 'route' => '/search'];
+        $field = new RequestField('get.q', 'abc123', 'get');
+        $normalized = 'abc123';
+        ThreatCache::remember(FingerprintCache::build($request, $field, $normalized));
+
+        $inspector = new FieldInspector(new Thresholds([
+            'paranoia_level' => 'medium',
+            'score_threshold' => 25,
+            'regex_threshold' => 10,
+        ]));
+
+        $result = $inspector->inspect($request, $field, $normalized, true);
+
+        $this->assertSame(25, $result->score());
+        $this->assertSame(['threat_cache' => 25], $result->toArray()['breakdown']);
+        $this->assertSame('THREAT_CACHE_HIT', $result->toArray()['matches'][0]['id']);
+    }
+
+    public function testThreatCacheTakesPrecedenceOverSafeCache(): void
+    {
+        $request = ['method' => 'GET', 'route' => '/search'];
+        $field = new RequestField('get.q', 'abc123', 'get');
+        $normalized = 'abc123';
+        $fingerprint = FingerprintCache::build($request, $field, $normalized);
+        SafeCache::remember($fingerprint);
+        ThreatCache::remember($fingerprint);
+
+        $inspector = new FieldInspector(new Thresholds([
+            'paranoia_level' => 'medium',
+            'score_threshold' => 25,
+            'regex_threshold' => 10,
+        ]));
+
+        $result = $inspector->inspect($request, $field, $normalized, true);
+
+        $this->assertNotNull($result);
+        $this->assertSame('THREAT_CACHE_HIT', $result->toArray()['matches'][0]['id']);
     }
 }
