@@ -17,9 +17,14 @@ class RequestContext
         return $this->request;
     }
 
-    public function addResult(array $result): void
+    public function addResult($result): void
     {
-        $this->results[] = $result;
+        if ($result instanceof ScanResult) {
+            $this->results[] = $result->toArray();
+            return;
+        }
+
+        $this->results[] = ScanResult::fromArray(is_array($result) ? $result : [])->toArray();
     }
 
     public function results(): array

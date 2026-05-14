@@ -65,5 +65,6 @@ class WafEngineTest extends TestCase
 
         $this->assertTrue($decision->shouldBlock());
         $this->assertSame('bot', $decision->reason());
+        $this->assertSame(['bot_guard' => 25], $decision->matchedResult()['breakdown']);
     }
 }

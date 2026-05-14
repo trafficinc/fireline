@@ -11,14 +11,14 @@ class Decision
     protected $context;
     protected $matchedResult;
 
-    public function __construct(bool $blocked, int $score = 0, string $reason = '', array $results = [], ?RequestContext $context = null, array $matchedResult = [])
+    public function __construct(bool $blocked, int $score = 0, string $reason = '', array $results = [], ?RequestContext $context = null, $matchedResult = [])
     {
         $this->blocked = $blocked;
         $this->score = $score;
         $this->reason = $reason;
         $this->results = $results;
         $this->context = $context;
-        $this->matchedResult = $matchedResult;
+        $this->matchedResult = $matchedResult instanceof ScanResult ? $matchedResult->toArray() : $matchedResult;
     }
 
     public static function allow(RequestContext $context): self
@@ -26,7 +26,7 @@ class Decision
         return new self(false, $context->totalScore(), 'allowed', $context->results(), $context);
     }
 
-    public static function block(RequestContext $context, string $reason, array $matchedResult = []): self
+    public static function block(RequestContext $context, string $reason, $matchedResult = []): self
     {
         if (empty($matchedResult)) {
             $results = $context->results();

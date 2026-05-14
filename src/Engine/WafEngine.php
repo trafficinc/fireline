@@ -59,13 +59,13 @@ class WafEngine
 
             $context->addResult($result);
 
-            if ($result['score'] >= $this->thresholds->blockThreshold()) {
-                ThreatCache::remember($result['fingerprint']);
+            if ($result->score() >= $this->thresholds->blockThreshold()) {
+                ThreatCache::remember($result->fingerprint());
                 return $this->finalizeDecision(Decision::block($context, 'field_score_threshold', $result));
             }
 
-            if ($result['score'] <= $this->thresholds->safeCacheThreshold()) {
-                SafeCache::remember($result['fingerprint']);
+            if ($result->score() <= $this->thresholds->safeCacheThreshold()) {
+                SafeCache::remember($result->fingerprint());
             }
         }
 
@@ -111,7 +111,7 @@ class WafEngine
         return (new DecisionEngine($this->thresholds->blockThreshold()))->finalize($context);
     }
 
-    protected function inspectField(array $request, RequestField $field, string $normalized, bool $useSafeCache): ?array
+    protected function inspectField(array $request, RequestField $field, string $normalized, bool $useSafeCache): ?ScanResult
     {
         $fingerprint = FingerprintCache::build($request, $field, $normalized);
 
@@ -139,44 +139,48 @@ class WafEngine
 
         $score->add('route_model', RouteLearner::compare((string) ($request['route'] ?? ''), $field, $normalized));
 
-        return [
-            'field' => $field->name(),
-            'source' => $field->source(),
-            'score' => $score->total(),
-            'matches' => $matches,
-            'breakdown' => $score->breakdown(),
-            'fingerprint' => $fingerprint,
-            'value' => $field->value(),
-            'normalized' => $normalized,
-        ];
+        return new ScanResult(
+            $field->name(),
+            $field->source(),
+            $score->total(),
+            $matches,
+            $score->breakdown(),
+            $fingerprint,
+            $field->value(),
+            $normalized
+        );
     }
 
     protected function inspectLegacyGuards(array $request, RequestContext $context)
     {
         $ip = new IpGuard();
         if (!$ip->safe($request['ip'], $this->config)) {
-            $context->addResult([
-                'field' => 'ip',
-                'source' => 'ip',
-                'score' => $this->thresholds->blockThreshold(),
-                'matches' => [],
-                'value' => $request['ip'],
-                'normalized' => $request['ip'],
-            ]);
+            $context->addResult(new ScanResult(
+                'ip',
+                'ip',
+                $this->thresholds->blockThreshold(),
+                [],
+                ['ip_guard' => $this->thresholds->blockThreshold()],
+                '',
+                (string) $request['ip'],
+                (string) $request['ip']
+            ));
 
             return Decision::block($context, 'ip');
         }
 
         $bots = new BotGuard();
         if (!$bots->safe($request['user_agent'], $this->config)) {
-            $context->addResult([
-                'field' => 'user_agent',
-                'source' => 'header',
-                'score' => $this->thresholds->blockThreshold(),
-                'matches' => [],
-                'value' => $bots->found(),
-                'normalized' => strtolower($bots->found()),
-            ]);
+            $context->addResult(new ScanResult(
+                'user_agent',
+                'header',
+                $this->thresholds->blockThreshold(),
+                [],
+                ['bot_guard' => $this->thresholds->blockThreshold()],
+                '',
+                $bots->found(),
+                strtolower($bots->found())
+            ));
 
             return Decision::block($context, 'bot');
         }
