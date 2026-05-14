@@ -276,9 +276,10 @@ Build route model candidates from replay data:
 ```bash
 php fire.php baseline:build storage/replay/traffic.ndjson 10
 php fire.php baseline:build storage/replay/traffic.ndjson 10 --json
+php fire.php baseline:build storage/replay/traffic.ndjson 10 --json --report
 ```
 
-`baseline:build` prints a PHP `config/routes.php` fragment for review by default. Use `--json` when automation needs the candidate model directly.
+`baseline:build` prints a PHP `config/routes.php` fragment for review by default. Use `--json` when automation needs the candidate model directly, or `--json --report` when it also needs replay read counts and invalid-line counts.
 
 Validate configuration and writable paths:
 

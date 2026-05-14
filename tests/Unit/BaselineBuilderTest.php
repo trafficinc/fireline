@@ -72,6 +72,35 @@ class BaselineBuilderTest extends TestCase
         $this->assertSame('N', $model['/orders']['fields']['get.id']['shape']);
     }
 
+    public function testBuildReportFromReplayFileIncludesInvalidLineCounts(): void
+    {
+        $path = sys_get_temp_dir() . '/fireline-baseline-' . uniqid('', true) . '.ndjson';
+        file_put_contents($path, json_encode($this->event('/orders', 'get.id', '100', false)) . PHP_EOL);
+        file_put_contents($path, '{bad json' . PHP_EOL, FILE_APPEND);
+        file_put_contents($path, json_encode($this->event('/orders', 'get.id', '101', false)) . PHP_EOL, FILE_APPEND);
+        file_put_contents($path, json_encode($this->event('/orders', 'get.id', '102', false)) . PHP_EOL, FILE_APPEND);
+
+        $report = BaselineBuilder::buildReportFromReplayFile($path, 3);
+        unlink($path);
+
+        $this->assertTrue($report['readable']);
+        $this->assertSame(4, $report['total']);
+        $this->assertSame(1, $report['invalid']);
+        $this->assertSame('int', $report['model']['/orders']['fields']['get.id']['type']);
+    }
+
+    public function testBuildReportFromMissingReplayFileHasEmptyShape(): void
+    {
+        $path = sys_get_temp_dir() . '/fireline-missing-baseline-' . uniqid('', true) . '.ndjson';
+
+        $report = BaselineBuilder::buildReportFromReplayFile($path, 3);
+
+        $this->assertFalse($report['readable']);
+        $this->assertSame(0, $report['total']);
+        $this->assertSame(0, $report['invalid']);
+        $this->assertSame([], $report['model']);
+    }
+
     public function testShapeModelKeepsNumericRunsDistinctFromLetters(): void
     {
         $events = [

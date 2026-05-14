@@ -253,6 +253,24 @@ class CliReplayTest extends TestCase
         $this->assertSame('int', $decoded['/orders']['fields']['get.id']['type']);
     }
 
+    public function testBaselineBuildCanOutputJsonReport(): void
+    {
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '100')) . PHP_EOL);
+        file_put_contents($this->path, '{bad json' . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '101')) . PHP_EOL, FILE_APPEND);
+        file_put_contents($this->path, json_encode($this->replayEvent('/orders', 'get.id', '102')) . PHP_EOL, FILE_APPEND);
+
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php baseline:build ' . escapeshellarg($this->path) . ' 3 --json --report';
+        exec($command, $output, $exitCode);
+
+        $decoded = json_decode(implode("\n", $output), true);
+        $this->assertSame(0, $exitCode);
+        $this->assertIsArray($decoded);
+        $this->assertSame(4, $decoded['total']);
+        $this->assertSame(1, $decoded['invalid']);
+        $this->assertSame('int', $decoded['model']['/orders']['fields']['get.id']['type']);
+    }
+
     public function testMetricsShowDisplaysSnapshot(): void
     {
         $command = escapeshellarg(PHP_BINARY) . ' fire.php metrics:show';

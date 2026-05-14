@@ -57,26 +57,46 @@ class BaselineBuilder
 
     public static function buildFromReplayFile(string $path, int $minSamples = 3): array
     {
+        return self::buildReportFromReplayFile($path, $minSamples)['model'];
+    }
+
+    public static function buildReportFromReplayFile(string $path, int $minSamples = 3): array
+    {
         if (!is_readable($path)) {
-            return [];
+            return self::report([], 0, 0, false);
         }
 
         $events = [];
+        $total = 0;
+        $invalid = 0;
         $handle = fopen($path, 'r');
         if (!$handle) {
-            return [];
+            return self::report([], 0, 0, false);
         }
 
         while (($line = fgets($handle)) !== false) {
+            $total++;
             $event = json_decode($line, true);
             if (is_array($event)) {
                 $events[] = $event;
+            } else {
+                $invalid++;
             }
         }
 
         fclose($handle);
 
-        return self::build($events, $minSamples);
+        return self::report(self::build($events, $minSamples), $total, $invalid, true);
+    }
+
+    protected static function report(array $model, int $total, int $invalid, bool $readable): array
+    {
+        return [
+            'model' => $model,
+            'total' => $total,
+            'invalid' => $invalid,
+            'readable' => $readable,
+        ];
     }
 
     protected static function fieldModel(array $values): array
