@@ -43,15 +43,15 @@ abstract class AbstractHandler implements Handler
         return $this->forward($filter, $request);
     }
 
-    protected function firstUnsafeValue($filter, array $request): ?string
+    protected function firstUnsafeValue(array $request, array $categories = []): ?string
     {
         return $this->firstBlockedValue($request, [
             'get_request_method' => 'get',
             'post_request_method' => 'post',
-        ]);
+        ], $categories);
     }
 
-    protected function firstBlockedValue(array $request, array $requestKeys): ?string
+    protected function firstBlockedValue(array $request, array $requestKeys, array $categories = []): ?string
     {
         $configs = is_array($request['configs'] ?? null) ? $request['configs'] : [];
         $thresholds = new Thresholds($configs);
@@ -67,12 +67,29 @@ abstract class AbstractHandler implements Handler
                 $field = new RequestField((string) $name, (string) $value, (string) $source);
                 $result = $inspector->inspect($engineRequest, $field, $normalizer->run($field->value()), false);
 
-                if ($result !== null && $result->score() >= $thresholds->blockThreshold()) {
+                if ($result !== null && $result->score() >= $thresholds->blockThreshold() && $this->matchesAllowedCategory($result->toArray(), $categories)) {
                     return (string) $value;
                 }
             }
         }
 
         return null;
+    }
+
+    protected function matchesAllowedCategory(array $result, array $categories): bool
+    {
+        if ($categories === []) {
+            return true;
+        }
+
+        $allowed = array_flip(array_map('strtolower', $categories));
+        foreach ((array) ($result['matches'] ?? []) as $match) {
+            $category = strtolower((string) ($match['category'] ?? ''));
+            if (isset($allowed[$category])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

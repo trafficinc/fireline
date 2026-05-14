@@ -20,7 +20,7 @@ class QueryHandler extends AbstractHandler
                 ],
             ], [
                 'query' => 'query',
-            ]);
+            ], ['xss', 'shell', 'lfi', 'rfi', 'webshell', 'scanner', 'php_injection', 'protocol', 'upload']);
 
             return $this->blockOrForward($badValue === null ? null : (string) ($request['query_string'] ?? ''), $filter, $request);
         }

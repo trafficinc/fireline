@@ -113,6 +113,17 @@ class HandlersTest extends TestCase
         $this->assertFalse($handler->blocked);
     }
 
+    public function testSqlHandlerDoesNotBlockXssOnlyPayloads(): void
+    {
+        $handler = new RecordingSqlHandler();
+
+        $handler->handle('sql', $this->request([
+            'get_request_method' => ['get.comment' => '<script>alert(1)</script>'],
+        ]));
+
+        $this->assertFalse($handler->blocked);
+    }
+
     public function testSqlHandlerForwardsBenignRequestsToNextHandler(): void
     {
         $handler = new RecordingSqlHandler();
@@ -149,6 +160,17 @@ class HandlersTest extends TestCase
 
         $handler->handle('xss', $this->request([
             'get_request_method' => ['get.q' => 'price is < 10 and quantity > 2'],
+        ]));
+
+        $this->assertFalse($handler->blocked);
+    }
+
+    public function testXssHandlerDoesNotBlockSqlOnlyPayloads(): void
+    {
+        $handler = new RecordingXssHandler();
+
+        $handler->handle('xss', $this->request([
+            'get_request_method' => ['get.id' => '1 union select password from users'],
         ]));
 
         $this->assertFalse($handler->blocked);

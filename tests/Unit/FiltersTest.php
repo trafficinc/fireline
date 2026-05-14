@@ -42,6 +42,13 @@ class FiltersTest extends TestCase
         $this->assertTrue($filter->safe('order history for customer 123', []));
     }
 
+    public function testSqlFilterDoesNotBlockXssOnlyPayloads(): void
+    {
+        $filter = new SQL();
+
+        $this->assertTrue($filter->safe('<script>alert(1)</script>', []));
+    }
+
     public function testXssPatternsAreBlocked(): void
     {
         $filter = new XSS();
@@ -57,6 +64,13 @@ class FiltersTest extends TestCase
 
         $this->assertTrue($filter->safe('price is < 10 and quantity > 2', []));
         $this->assertTrue($filter->safe('support@example.com', []));
+    }
+
+    public function testXssFilterDoesNotBlockSqlOnlyPayloads(): void
+    {
+        $filter = new XSS();
+
+        $this->assertTrue($filter->safe('1 union select password from users', []));
     }
 
     public function testBotDetectionBlocksKnownAndEmptyAgents(): void
