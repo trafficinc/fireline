@@ -26,6 +26,7 @@ class EventFormatter
             'score' => $decision->score(),
             'matched_score' => (int) ($matched['score'] ?? 0),
             'reason' => self::clean($decision->reason()),
+            'explanation' => $decision->explanation(),
             'value' => self::redact(self::clean((string) ($matched['value'] ?? ''))),
             'normalized' => self::redact(self::clean((string) ($matched['normalized'] ?? ''))),
             'user_agent' => self::clean((string) ($request['user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? ''))),

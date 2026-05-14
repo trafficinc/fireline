@@ -10,7 +10,10 @@ return [
     'inspect_json' => true,
     'inspect_headers' => true,
     'inspect_raw_body' => true,
-    'score_threshold' => 25,
-    'regex_threshold' => 10,
-    'safe_cache_threshold' => 3,
+    'paranoia_level' => 'medium',
+    'replay_enabled' => false,
+    'replay_path' => __DIR__ . '/storage/replay/traffic.ndjson',
+    'score_threshold' => null,
+    'regex_threshold' => null,
+    'safe_cache_threshold' => null,
 ];

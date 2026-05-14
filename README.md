@@ -93,9 +93,9 @@ return [
     'inspect_json' => true,
     'inspect_headers' => true,
     'inspect_raw_body' => true,
-    'score_threshold' => 25,
-    'regex_threshold' => 10,
-    'safe_cache_threshold' => 3,
+    'score_threshold' => null,
+    'regex_threshold' => null,
+    'safe_cache_threshold' => null,
 ];
 ```
 
@@ -110,6 +110,9 @@ Config options:
 - `inspect_json`: inspects JSON request bodies for `application/json` requests.
 - `inspect_headers`: inspects HTTP headers, excluding `Cookie` because cookies are inspected separately.
 - `inspect_raw_body`: inspects raw bodies for non-form and non-JSON content types.
+- `paranoia_level`: detection posture. Supported values are `low`, `medium`, `high`, and `strict`.
+- `replay_enabled`: writes normalized replay events when set to `true`.
+- `replay_path`: JSON-lines replay file path.
 - `score_threshold`: field score required to block a request.
 - `regex_threshold`: score required before conditional regex rules run.
 - `safe_cache_threshold`: maximum score eligible for short-lived safe fingerprint caching.
@@ -151,16 +154,90 @@ return [
         'post.username' => [
             'type' => 'alnum',
             'max_length' => 64,
+            'allowed_chars' => 'alnum',
+            'denied_tokens' => ['union', 'select', 'sleep', 'script'],
         ],
         'post.password' => [
             'type' => 'opaque',
             'max_length' => 256,
         ],
+        'get.q' => [
+            'type' => 'text',
+            'max_length' => 256,
+            'allowed_chars' => 'free_text',
+        ],
     ],
 ];
 ```
 
-Supported field types are `alpha`, `alnum`, `int`, `integer`, `numeric`, `email`, `slug`, `url`, `text`, and `opaque`. Route models are scoring signals, not standalone block rules.
+Supported field types are `alpha`, `alnum`, `int`, `integer`, `numeric`, `email`, `slug`, `url`, `text`, and `opaque`.
+
+Route fields can define:
+
+- `min_length`, `max_length`, and `avg_length`
+- `allowed_chars`: `alpha`, `alnum`, `slug`, `free_text`, or a bounded regex
+- `shape`: a normalized shape from `ShapeModel::shape()`
+- `required_tokens`: tokens expected to appear
+- `denied_tokens`: route-specific tokens that should raise anomaly score
+
+Route models are scoring signals, not standalone block rules.
+
+## Paranoia Levels
+
+Paranoia levels provide adoption-friendly defaults:
+
+- `low`: conservative blocking for high false-positive sensitivity.
+- `medium`: default balanced mode.
+- `high`: more aggressive scoring and earlier regex checks.
+- `strict`: aggressive mode for applications that can tolerate more blocking.
+
+Explicit `score_threshold`, `regex_threshold`, and `safe_cache_threshold` values override the level defaults.
+
+## Explainability
+
+Every decision can produce a developer-facing explanation:
+
+```php
+$decision = $waf->inspectCurrentRequest();
+
+echo $decision->explain(25);
+```
+
+Example:
+
+```text
+Blocked:
+- rule:SQL_BOOLEAN_OPERATOR (+6)
+- encoding_heuristics (+4)
+- route_model (+7)
+Final Score: 17
+Threshold: 15
+```
+
+Use `$decision->explanation()` when structured data is easier to display or store.
+
+## Replay
+
+Replay mode stores normalized request fields, matched rules, scores, and decisions as JSON lines. Enable it in config:
+
+```php
+'replay_enabled' => true,
+'replay_path' => __DIR__ . '/storage/replay/traffic.ndjson',
+```
+
+Replay stored traffic after rule or scoring changes:
+
+```php
+use Fireline\Replay\ReplayRunner;
+
+$result = (new ReplayRunner())->replay(__DIR__ . '/storage/replay/traffic.ndjson');
+
+foreach ($result['regressions'] as $regression) {
+    print_r($regression);
+}
+```
+
+Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, score increases, and false-positive regressions before deployment.
 
 ## Rule Files
 

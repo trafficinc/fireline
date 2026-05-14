@@ -3,6 +3,7 @@
 namespace Fireline\Learning;
 
 use Fireline\Extract\RequestField;
+use Fireline\Scan\Tokenizer;
 use Fireline\Telemetry\RuleMetrics;
 
 class RouteLearner
@@ -42,6 +43,32 @@ class RouteLearner
         if ($type !== '' && !self::matchesType($normalized, $type)) {
             $score += self::typeScore($type);
             RuleMetrics::increment('route_model.type.' . $type);
+        }
+
+        if (isset($model['allowed_chars']) && !self::matchesAllowedChars($normalized, (string) $model['allowed_chars'])) {
+            $score += 8;
+            RuleMetrics::increment('route_model.allowed_chars');
+        }
+
+        if (isset($model['shape']) && ShapeModel::shape($normalized) !== (string) $model['shape']) {
+            $score += 4;
+            RuleMetrics::increment('route_model.shape');
+        }
+
+        $tokens = array_map('strtolower', Tokenizer::tokens($normalized));
+
+        foreach (self::listValue($model['required_tokens'] ?? []) as $token) {
+            if (!in_array(strtolower($token), $tokens, true)) {
+                $score += 3;
+                RuleMetrics::increment('route_model.required_token');
+            }
+        }
+
+        foreach (self::listValue($model['denied_tokens'] ?? []) as $token) {
+            if (in_array(strtolower($token), $tokens, true)) {
+                $score += 10;
+                RuleMetrics::increment('route_model.denied_token');
+            }
         }
 
         return $score;
@@ -125,5 +152,35 @@ class RouteLearner
     protected static function typeScore(string $type): int
     {
         return in_array($type, ['alpha', 'alnum', 'int', 'integer', 'numeric', 'slug'], true) ? 12 : 6;
+    }
+
+    protected static function matchesAllowedChars(string $value, string $pattern): bool
+    {
+        if ($value === '') {
+            return true;
+        }
+
+        $presets = [
+            'alpha' => '/\A[a-z]+\z/i',
+            'alnum' => '/\A[a-z0-9]+\z/i',
+            'slug' => '/\A[a-z0-9_-]+\z/i',
+            'free_text' => '/\A[\pL\pN\s.,:_@\/#&?+=()!\'"-]+\z/u',
+        ];
+
+        $regex = $presets[$pattern] ?? $pattern;
+        if (@preg_match($regex, '') === false) {
+            return true;
+        }
+
+        return preg_match($regex, $value) === 1;
+    }
+
+    protected static function listValue($value): array
+    {
+        if (is_string($value)) {
+            return [$value];
+        }
+
+        return is_array($value) ? array_values($value) : [];
     }
 }

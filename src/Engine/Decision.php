@@ -67,8 +67,62 @@ class Decision
         return $this->matchedResult;
     }
 
+    public function explanation(int $threshold = 0): array
+    {
+        $result = $this->matchedResult ?: $this->highestResult();
+        $breakdown = is_array($result['breakdown'] ?? null) ? $result['breakdown'] : [];
+        arsort($breakdown);
+
+        return [
+            'decision' => $this->blocked ? 'blocked' : 'allowed',
+            'reason' => $this->reason,
+            'field' => (string) ($result['field'] ?? ''),
+            'score' => (int) ($result['score'] ?? $this->score),
+            'threshold' => $threshold,
+            'signals' => $breakdown,
+            'matched_rules' => array_values(array_map(function (array $match): string {
+                return (string) ($match['id'] ?? $match['pattern'] ?? 'unknown');
+            }, is_array($result['matches'] ?? null) ? $result['matches'] : [])),
+        ];
+    }
+
+    public function explain(int $threshold = 0): string
+    {
+        $explanation = $this->explanation($threshold);
+        $lines = [
+            ucfirst($explanation['decision']) . ':',
+        ];
+
+        foreach ($explanation['signals'] as $name => $score) {
+            $lines[] = '- ' . $name . ' (+' . $score . ')';
+        }
+
+        $lines[] = 'Final Score: ' . $explanation['score'];
+        if ($threshold > 0) {
+            $lines[] = 'Threshold: ' . $threshold;
+        }
+
+        return implode(PHP_EOL, $lines);
+    }
+
     public function context()
     {
         return $this->context;
+    }
+
+    protected function highestResult(): array
+    {
+        $highest = [];
+        foreach ($this->results as $result) {
+            if (!is_array($result)) {
+                continue;
+            }
+
+            if ((int) ($result['score'] ?? 0) > (int) ($highest['score'] ?? -1)) {
+                $highest = $result;
+            }
+        }
+
+        return $highest;
     }
 }
