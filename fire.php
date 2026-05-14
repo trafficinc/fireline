@@ -13,6 +13,7 @@ require "autoload.php";
 require "./cli/Cli/clihelpers.php";
 
 use Cli\Cli;
+use Fireline\Learning\BaselineBuilder;
 use Fireline\Replay\ReplayRunner;
 
 $cli = new Cli();
@@ -43,6 +44,8 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  replay:run  |  Replay stored traffic and show changes.  |
 +--------------+-------------------------------------------+
+|  baseline:build | Build route model candidates from replay. |
++--------------+-------------------------------------------+
 |  example     |  php fire.php replay:run storage/replay/traffic.ndjson |
 +--------------+-------------------------------------------+";
     $cli->getPrinter()->display( $menu );
@@ -71,6 +74,19 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
     }
 
     $cli->getPrinter()->display(implode(PHP_EOL, $lines));
+});
+
+$cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
+    $path = $argv[2] ?? __DIR__ . '/storage/replay/traffic.ndjson';
+    $minSamples = isset($argv[3]) ? max(1, (int) $argv[3]) : 3;
+    $model = BaselineBuilder::buildFromReplayFile($path, $minSamples);
+
+    $cli->getPrinter()->display(
+        "Replay file: " . $path . PHP_EOL .
+        "Minimum samples: " . $minSamples . PHP_EOL .
+        "Route model:" . PHP_EOL .
+        var_export($model, true)
+    );
 });
 
 $cli->runCommand($argv);

@@ -245,6 +245,12 @@ The same replay check is available from the CLI:
 php fire.php replay:run storage/replay/traffic.ndjson
 ```
 
+Build route model candidates from replay data:
+
+```bash
+php fire.php baseline:build storage/replay/traffic.ndjson 10
+```
+
 ## Rule Files
 
 Rules are stored in [src/Compares](src/Compares):
@@ -365,7 +371,7 @@ composer run smoke
 composer run lint
 ```
 
-The `fire.php` CLI exposes `help` and `replay:run`.
+The `fire.php` CLI exposes `help`, `replay:run`, and `baseline:build`.
 
 ## Troubleshooting
 
