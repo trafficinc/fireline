@@ -17,13 +17,7 @@ Fireline currently inspects:
 - `ext-json`
 - Writable `storage/logs/fireline.log`
 
-Composer can be run with the checked-in PHAR:
-
-```bash
-php composer.phar install
-```
-
-Or with Composer installed globally:
+Install dependencies with Composer installed globally:
 
 ```bash
 composer install
@@ -332,7 +326,7 @@ Legacy compare lists remain in [src/Compares](src/Compares) for compatibility wr
 - `ips_white_list.php`: allowed IPs and CIDR ranges when whitelist mode is enabled.
 - `ip_block_by_country.php`: country ISO codes blocked when country blocking is enabled.
 
-The historical `sql.php`, `xss.php`, and `query.php` files are kept for older tooling, but the compatibility filters now delegate detection to the staged engine so new rule work should happen in `config/rules.php`.
+The historical SQL, XSS, and query compare files have been removed. Compatibility filters now delegate detection to the staged engine, so new rule work should happen in `config/rules.php`.
 
 ## Logging
 
@@ -434,34 +428,37 @@ php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metric
 Run tests:
 
 ```bash
-php composer.phar test
+composer test
 ```
 
 Run the smoke test:
 
 ```bash
-php composer.phar run smoke
+composer run smoke
 ```
 
 Run PHP syntax checks:
 
 ```bash
-php composer.phar run lint
+composer run lint
 ```
 
 Validate rule metadata and regex syntax:
 
 ```bash
-php composer.phar run rules:validate
+composer run rules:validate
 ```
 
-The same commands work with global Composer:
+Validate configuration, writable paths, and rules:
 
 ```bash
-composer test
-composer run smoke
-composer run lint
-composer run rules:validate
+composer run config:check
+```
+
+Run the full local verification suite:
+
+```bash
+composer run check
 ```
 
 The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `baseline:export`, `config:check`, `rules:validate`, `metrics:show`, `metrics:export`, and `metrics:reset`.
@@ -498,13 +495,3 @@ Country blocking fails closed if enabled and the GeoIP database is missing or un
 - Confirm `storage/logs/fireline.log` exists.
 - Confirm it is writable by the web server user.
 - Confirm PHP has permission to write inside `storage/logs`.
-
-### Composer install fails on old Composer
-
-Use the checked-in Composer 2 PHAR:
-
-```bash
-php composer.phar install
-```
-
-Composer 1 is no longer supported by Packagist.
