@@ -22,6 +22,7 @@ class ReplayRunner
         $total = 0;
         $invalid = 0;
         $regressions = [];
+        $stats = $this->emptyStats();
         $handle = fopen($path, 'r');
         if (!$handle) {
             return $this->emptyResult();
@@ -35,7 +36,9 @@ class ReplayRunner
             }
 
             $total++;
-            $regression = $this->compareEvent($event, $this->engine->inspectReplayEvent($event));
+            $decision = $this->engine->inspectReplayEvent($event);
+            $this->recordStats($stats, $event, $decision);
+            $regression = $this->compareEvent($event, $decision);
             if ($regression !== null) {
                 $regressions[] = $regression;
             }
@@ -47,7 +50,7 @@ class ReplayRunner
             'total' => $total,
             'invalid' => $invalid,
             'regressions' => $regressions,
-            'summary' => $this->summary($total, $invalid, $regressions),
+            'summary' => $this->summary($total, $invalid, $regressions, $stats),
             'metadata' => [
                 'current' => $this->engine->replayMetadata(),
             ],
@@ -60,7 +63,7 @@ class ReplayRunner
             'total' => 0,
             'invalid' => 0,
             'regressions' => [],
-            'summary' => $this->summary(0, 0, []),
+            'summary' => $this->summary(0, 0, [], $this->emptyStats()),
             'metadata' => [
                 'current' => $this->engine->replayMetadata(),
             ],
@@ -150,7 +153,46 @@ class ReplayRunner
         ];
     }
 
-    protected function summary(int $total, int $invalid, array $regressions): array
+    protected function emptyStats(): array
+    {
+        return [
+            'previous_blocked' => 0,
+            'current_blocked' => 0,
+            'allowed_to_blocked' => 0,
+            'blocked_to_allowed' => 0,
+            'unchanged_decision' => 0,
+            'score_increased' => 0,
+            'score_decreased' => 0,
+            'score_unchanged' => 0,
+            'total_score_delta' => 0,
+            'max_score_increase' => 0,
+            'max_score_decrease' => 0,
+        ];
+    }
+
+    protected function recordStats(array &$stats, array $event, $decision): void
+    {
+        $previous = $event['decision'] ?? [];
+        $previousScore = (int) ($previous['score'] ?? 0);
+        $previousBlocked = (bool) ($previous['blocked'] ?? false);
+        $currentScore = $decision->score();
+        $currentBlocked = $decision->shouldBlock();
+        $delta = $currentScore - $previousScore;
+
+        $stats['previous_blocked'] += $previousBlocked ? 1 : 0;
+        $stats['current_blocked'] += $currentBlocked ? 1 : 0;
+        $stats['allowed_to_blocked'] += (!$previousBlocked && $currentBlocked) ? 1 : 0;
+        $stats['blocked_to_allowed'] += ($previousBlocked && !$currentBlocked) ? 1 : 0;
+        $stats['unchanged_decision'] += ($previousBlocked === $currentBlocked) ? 1 : 0;
+        $stats['score_increased'] += $delta > 0 ? 1 : 0;
+        $stats['score_decreased'] += $delta < 0 ? 1 : 0;
+        $stats['score_unchanged'] += $delta === 0 ? 1 : 0;
+        $stats['total_score_delta'] += $delta;
+        $stats['max_score_increase'] = max($stats['max_score_increase'], $delta);
+        $stats['max_score_decrease'] = min($stats['max_score_decrease'], $delta);
+    }
+
+    protected function summary(int $total, int $invalid, array $regressions, array $stats): array
     {
         $byType = [
             'new_block' => 0,
@@ -177,6 +219,22 @@ class ReplayRunner
             'regressions' => count($regressions),
             'by_type' => $byType,
             'by_route' => $byRoute,
+            'decision_changes' => [
+                'previous_blocked' => $stats['previous_blocked'],
+                'current_blocked' => $stats['current_blocked'],
+                'allowed_to_blocked' => $stats['allowed_to_blocked'],
+                'blocked_to_allowed' => $stats['blocked_to_allowed'],
+                'unchanged' => $stats['unchanged_decision'],
+            ],
+            'score_deltas' => [
+                'increased' => $stats['score_increased'],
+                'decreased' => $stats['score_decreased'],
+                'unchanged' => $stats['score_unchanged'],
+                'total_delta' => $stats['total_score_delta'],
+                'average_delta' => $total > 0 ? $stats['total_score_delta'] / $total : 0,
+                'max_increase' => $stats['max_score_increase'],
+                'max_decrease' => $stats['max_score_decrease'],
+            ],
         ];
     }
 }

@@ -255,7 +255,7 @@ foreach ($result['regressions'] as $regression) {
 }
 ```
 
-Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, missed blocks, score increases, and false-positive regressions before deployment. Replay metadata includes thresholds, paranoia level, selected config values, and an active rule-set fingerprint so config changes and rule changes can be distinguished. When metadata differs, replay output reports the changed metadata groups, such as `thresholds`, `config`, or `rules`. Invalid replay lines are counted separately so corrupt capture files are visible.
+Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, missed blocks, score increases, and false-positive regressions before deployment. Replay metadata includes thresholds, paranoia level, selected config values, and an active rule-set fingerprint so config changes and rule changes can be distinguished. When metadata differs, replay output reports the changed metadata groups, such as `thresholds`, `config`, or `rules`. Invalid replay lines are counted separately so corrupt capture files are visible. Replay summaries also include decision-change counts and score-delta aggregates, so broad tuning drift is visible even when traffic does not cross the block threshold.
 
 The same replay check is available from the CLI:
 
@@ -275,6 +275,15 @@ Use `--json` when automation needs the full replay result:
 php fire.php replay:run storage/replay/traffic.ndjson --json
 ```
 
+Write a JSON replay report for CI artifacts or rule-review notes:
+
+```bash
+php fire.php replay:run storage/replay/traffic.ndjson --output storage/replay/report.json
+php fire.php replay:run storage/replay/traffic.ndjson --output storage/replay/report.json --force
+```
+
+Existing report files are not overwritten unless `--force` is supplied.
+
 Build route model candidates from replay data:
 
 ```bash
@@ -289,7 +298,7 @@ php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/rou
 `baseline:build` prints a PHP `config/routes.php` fragment for review by default. Use `--json` when automation needs the candidate model directly, or `--json --report` when it also needs replay read counts and invalid-line counts.
 Use `baseline:export` to write the reviewed candidate model to a target PHP file. Add `--dry-run` to preview the destination and replay counts without writing. Existing files are not overwritten unless `--force` is supplied.
 
-Validate configuration and writable paths:
+Validate configuration, writable paths, and rule metadata:
 
 ```bash
 php fire.php config:check
@@ -297,17 +306,33 @@ php fire.php config:check
 
 ## Rule Files
 
-Rules are stored in [src/Compares](src/Compares):
+The staged WAF rule set is stored in [config/rules.php](config/rules.php). Each rule includes:
 
-- `sql.php`: SQL injection patterns
-- `xss.php`: XSS and browser abuse patterns
-- `query.php`: suspicious query string patterns
-- `bots.php`: blocked user agents
-- `ips.php`: blocked IPs or partial IP strings
-- `ips_white_list.php`: allowed IPs and CIDR ranges when whitelist mode is enabled
-- `ip_block_by_country.php`: country ISO codes blocked when country blocking is enabled
+- `id`: stable rule identifier used in decisions, replay, and metrics.
+- `type`: `keyword` for Aho-Corasick scanning or `regex` for conditional regex confirmation.
+- `pattern`: keyword text or a bounded regular expression.
+- `score`: contribution to the field score.
+- `category`: detection family such as `sqli`, `xss`, `lfi`, `rfi`, `webshell`, `scanner`, `php_injection`, `protocol`, or `upload`.
+- `paranoia`: minimum posture where the rule is active: `low`, `medium`, `high`, or `strict`.
+- `explanation`, `examples`, and `false_positives`: reviewer context for tuning.
 
-Most rule files contain regular expressions. Empty lines and lines beginning with `#` are ignored.
+Keyword rules run first through the Aho-Corasick scanner. Regex rules run only after the field is already suspicious and their required tokens are present.
+
+Validate rule metadata and regex syntax after editing the rule set:
+
+```bash
+php fire.php rules:validate
+php fire.php rules:validate config/rules.php --json
+```
+
+Legacy compare lists remain in [src/Compares](src/Compares) for compatibility wrappers and guard lists:
+
+- `bots.php`: blocked user agents used by `BotGuard`.
+- `ips.php`: blocked IPs or partial IP strings used by `IpGuard`.
+- `ips_white_list.php`: allowed IPs and CIDR ranges when whitelist mode is enabled.
+- `ip_block_by_country.php`: country ISO codes blocked when country blocking is enabled.
+
+The historical `sql.php`, `xss.php`, and `query.php` files are kept for older tooling, but the compatibility filters now delegate detection to the staged engine so new rule work should happen in `config/rules.php`.
 
 ## Logging
 
@@ -424,15 +449,22 @@ Run PHP syntax checks:
 php composer.phar run lint
 ```
 
+Validate rule metadata and regex syntax:
+
+```bash
+php composer.phar run rules:validate
+```
+
 The same commands work with global Composer:
 
 ```bash
 composer test
 composer run smoke
 composer run lint
+composer run rules:validate
 ```
 
-The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `baseline:export`, `config:check`, `metrics:show`, `metrics:export`, and `metrics:reset`.
+The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, `baseline:export`, `config:check`, `rules:validate`, `metrics:show`, `metrics:export`, and `metrics:reset`.
 
 Show the current in-process metrics snapshot:
 

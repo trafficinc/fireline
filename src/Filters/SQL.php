@@ -9,7 +9,7 @@ class SQL extends BaseFilter
     /**
      * @var string
      */
-    protected $compares_file = "sql.php";
+    protected $compares_file = "";
 
     public function safe(string $value, array $configs): bool
     {

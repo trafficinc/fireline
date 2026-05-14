@@ -14,4 +14,6 @@ class Categories
     const SCANNER = 'scanner';
     const ENCODING = 'encoding';
     const PROTOCOL = 'protocol';
+    const PHP_INJECTION = 'php_injection';
+    const UPLOAD = 'upload';
 }

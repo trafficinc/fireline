@@ -9,7 +9,7 @@ class XSS extends BaseFilter
     /**
      * @var string
      */
-    protected $compares_file = "xss.php";
+    protected $compares_file = "";
 
     public function safe(string $value, array $configs): bool
     {

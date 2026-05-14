@@ -14,6 +14,7 @@ use Fireline\Config\ConfigChecker;
 use Fireline\Learning\BaselineBuilder;
 use Fireline\Learning\RouteModelExporter;
 use Fireline\Replay\ReplayRunner;
+use Fireline\Rules\RuleValidator;
 use Fireline\Telemetry\MetricsFormatter;
 use Fireline\Telemetry\RuleMetrics;
 use Fireline\Telemetry\MetricsStore;
@@ -34,6 +35,8 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  config:check | Validate Fireline config and writable paths. |
 +--------------+-------------------------------------------+
+|  rules:validate | Validate rule metadata and regex syntax. |
++--------------+-------------------------------------------+
 |  metrics:show | Show in-process metrics snapshot.          |
 +--------------+-------------------------------------------+
 |  metrics:export | Export persisted metrics JSON.           |
@@ -42,11 +45,13 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  examples    |  php fire.php replay:run storage/replay/traffic.ndjson |
 |              |  php fire.php replay:run storage/replay/traffic.ndjson --json |
+|              |  php fire.php replay:run storage/replay/traffic.ndjson --output storage/replay/report.json |
 |              |  php fire.php baseline:build storage/replay/traffic.ndjson 10 --json |
 |              |  php fire.php baseline:build storage/replay/traffic.ndjson 10 --json --report |
 |              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php |
 |              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --dry-run |
 |              |  php fire.php baseline:export storage/replay/traffic.ndjson 10 storage/models/routes.generated.php --force |
+|              |  php fire.php rules:validate config/rules.php --json |
 |              |  php fire.php metrics:show storage/metrics/fireline-metrics.json --summary |
 |              |  php fire.php metrics:export storage/metrics/fireline-metrics.json storage/metrics/export.json |
 +--------------+-------------------------------------------+";
@@ -56,9 +61,28 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
     $ciMode = CommandArgs::hasFlag($argv, '--ci');
     $jsonMode = CommandArgs::hasFlag($argv, '--json');
-    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/replay/traffic.ndjson');
+    $outputPath = CommandArgs::optionValue($argv, '--output');
+    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/storage/replay/traffic.ndjson', ['--output']);
 
     $result = (new ReplayRunner())->replay($path);
+    if ($outputPath !== null && $outputPath !== '') {
+        if (is_file($outputPath) && !CommandArgs::hasFlag($argv, '--force')) {
+            $cli->getPrinter()->display('Replay report exists; use --force to overwrite: ' . $outputPath);
+            exit(1);
+        }
+
+        $dir = dirname($outputPath);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            $cli->getPrinter()->display('Unable to create replay report directory: ' . $dir);
+            exit(1);
+        }
+
+        $encodedReport = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (!is_string($encodedReport) || file_put_contents($outputPath, $encodedReport . PHP_EOL, LOCK_EX) === false) {
+            $cli->getPrinter()->display('Unable to write replay report: ' . $outputPath);
+            exit(1);
+        }
+    }
 
     if ($jsonMode) {
         $encoded = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -77,6 +101,26 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
         'Invalid lines: ' . ($result['invalid'] ?? 0),
         'Regressions: ' . count($result['regressions']),
     ];
+
+    if ($outputPath !== null && $outputPath !== '') {
+        $lines[] = 'Report written: ' . $outputPath;
+    }
+
+    if (isset($result['summary']['decision_changes']) && is_array($result['summary']['decision_changes'])) {
+        $changes = $result['summary']['decision_changes'];
+        $lines[] = 'Decision changes: allowed_to_blocked=' . ($changes['allowed_to_blocked'] ?? 0)
+            . ', blocked_to_allowed=' . ($changes['blocked_to_allowed'] ?? 0)
+            . ', unchanged=' . ($changes['unchanged'] ?? 0);
+    }
+
+    if (isset($result['summary']['score_deltas']) && is_array($result['summary']['score_deltas'])) {
+        $deltas = $result['summary']['score_deltas'];
+        $lines[] = 'Score deltas: increased=' . ($deltas['increased'] ?? 0)
+            . ', decreased=' . ($deltas['decreased'] ?? 0)
+            . ', unchanged=' . ($deltas['unchanged'] ?? 0)
+            . ', total=' . ($deltas['total_delta'] ?? 0)
+            . ', average=' . round((float) ($deltas['average_delta'] ?? 0), 2);
+    }
 
     if (isset($result['summary']['by_type']) && is_array($result['summary']['by_type']) && array_sum($result['summary']['by_type']) > 0) {
         $lines[] = 'By type:';
@@ -191,6 +235,33 @@ $cli->registerCommand('config:check', function (array $argv) use ($cli) {
     }
 
     $cli->getPrinter()->display(implode(PHP_EOL, $lines));
+
+    if (!$result['ok']) {
+        exit(1);
+    }
+});
+
+$cli->registerCommand('rules:validate', function (array $argv) use ($cli) {
+    $path = CommandArgs::firstValue($argv, 2, __DIR__ . '/config/rules.php');
+    $result = (new RuleValidator())->validateFile($path);
+
+    if (CommandArgs::hasFlag($argv, '--json')) {
+        $encoded = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        $cli->getPrinter()->display(is_string($encoded) ? $encoded : '{}');
+    } else {
+        $lines = [
+            'Rule status: ' . ($result['ok'] ? 'ok' : 'error'),
+            'Rule file: ' . $path,
+            'Rules checked: ' . $result['total'],
+            'Errors: ' . count($result['errors']),
+        ];
+
+        foreach ($result['errors'] as $error) {
+            $lines[] = '[ERROR] ' . $error['rule'] . ' ' . $error['field'] . ': ' . $error['message'];
+        }
+
+        $cli->getPrinter()->display(implode(PHP_EOL, $lines));
+    }
 
     if (!$result['ok']) {
         exit(1);

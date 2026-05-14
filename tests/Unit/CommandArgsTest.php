@@ -25,6 +25,21 @@ class CommandArgsTest extends TestCase
         $this->assertSame(['metrics.json', 'export.json'], CommandArgs::values($argv, 2));
     }
 
+    public function testCanSkipKnownOptionValues(): void
+    {
+        $argv = ['fire.php', 'replay:run', '--output', 'report.json', 'traffic.ndjson'];
+
+        $this->assertSame('traffic.ndjson', CommandArgs::firstValue($argv, 2, 'default', ['--output']));
+        $this->assertSame('report.json', CommandArgs::optionValue($argv, '--output'));
+    }
+
+    public function testCanReadEqualsStyleOptionValues(): void
+    {
+        $argv = ['fire.php', 'replay:run', '--output=report.json'];
+
+        $this->assertSame('report.json', CommandArgs::optionValue($argv, '--output'));
+    }
+
     public function testIntValueHonorsMinimum(): void
     {
         $argv = ['fire.php', 'baseline:build', 'traffic.ndjson', '0'];

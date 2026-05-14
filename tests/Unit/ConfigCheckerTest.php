@@ -67,6 +67,18 @@ class ConfigCheckerTest extends TestCase
         $this->assertSame('ok', $storageCheck['status']);
     }
 
+    public function testReportsRuleValidationStatus(): void
+    {
+        $result = (new ConfigChecker(dirname(__DIR__, 2)))->check();
+
+        $ruleCheck = array_values(array_filter($result['checks'], function (array $check): bool {
+            return $check['name'] === 'rules';
+        }))[0];
+
+        $this->assertSame('ok', $ruleCheck['status']);
+        $this->assertStringContainsString('Validated', $ruleCheck['message']);
+    }
+
     public function testReportsMetricsPathWhenConfigured(): void
     {
         $result = (new ConfigChecker(dirname(__DIR__, 2)))->check([

@@ -9,7 +9,7 @@ class Query extends BaseFilter
     /**
      * @var string
      */
-    protected $compares_file = "query.php";
+    protected $compares_file = "";
 
     /**
      * Check given string

@@ -16,6 +16,10 @@ abstract class BaseFilter
      * BaseFilter constructor.
      */
     public function __construct(){
+        if ($this->compares_file === '') {
+            return;
+        }
+
         $compares = require __DIR__ . '/Compares/' . $this->compares_file;
 
         if ($compares !== false) {

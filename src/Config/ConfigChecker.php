@@ -2,6 +2,8 @@
 
 namespace Fireline\Config;
 
+use Fireline\Rules\RuleValidator;
+
 class ConfigChecker
 {
     protected $root;
@@ -28,6 +30,7 @@ class ConfigChecker
             $this->writablePath('replay_path', (string) ($config['replay_path'] ?? '')),
             $this->optionalWritablePath('metrics_path', $config['metrics_path'] ?? null),
             $this->writablePath('log_file', $this->logPath()),
+            $this->rules(),
             $this->apcu(),
         ];
 
@@ -190,6 +193,20 @@ class ConfigChecker
     protected function logPath(): string
     {
         return $this->root . '/storage/logs/fireline.log';
+    }
+
+    protected function rules(): array
+    {
+        $path = $this->root . '/config/rules.php';
+        $result = (new RuleValidator())->validateFile($path);
+
+        return [
+            'name' => 'rules',
+            'status' => $result['ok'] ? 'ok' : 'error',
+            'message' => $result['ok']
+                ? 'Validated ' . $result['total'] . ' rules'
+                : count($result['errors']) . ' rule validation error(s)',
+        ];
     }
 
     protected function apcu(): array

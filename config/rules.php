@@ -222,6 +222,17 @@ return [
         'false_positives' => ['Applications that intentionally accept legacy protocol URLs'],
     ],
     [
+        'id' => 'PROTOCOL_FILE_URL',
+        'type' => 'keyword',
+        'pattern' => 'file://',
+        'score' => 18,
+        'category' => 'protocol',
+        'paranoia' => 'high',
+        'explanation' => 'Detects local file URL probes commonly used in SSRF and file disclosure attempts.',
+        'examples' => ['url=file:///etc/passwd'],
+        'false_positives' => ['Applications that intentionally accept local file URLs'],
+    ],
+    [
         'id' => 'UPLOAD_PHP_EXTENSION',
         'type' => 'keyword',
         'pattern' => '.php',

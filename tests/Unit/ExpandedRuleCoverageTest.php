@@ -86,6 +86,16 @@ class ExpandedRuleCoverageTest extends TestCase
         $this->assertLessThan(18, $benign->score());
     }
 
+    public function testBlocksFileProtocolAbuseAtHighParanoia(): void
+    {
+        $probe = $this->inspect('get.url', 'url=file:///etc/passwd', 'high');
+        $benign = $this->inspect('get.note', 'attached file name is invoice.pdf', 'high');
+
+        $this->assertGreaterThanOrEqual(18, $probe->score());
+        $this->assertContains('PROTOCOL_FILE_URL', array_column($probe->toArray()['matches'], 'id'));
+        $this->assertLessThan(18, $benign->score());
+    }
+
     public function testBlocksUploadDoubleExtensionEvasion(): void
     {
         $probe = $this->inspect('file.avatar.name', 'avatar.php.jpg', 'medium', 'file');

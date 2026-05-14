@@ -30,9 +30,52 @@ class CliReplayTest extends TestCase
         $this->assertStringContainsString('replay:run', $text);
         $this->assertStringContainsString('baseline:build', $text);
         $this->assertStringContainsString('baseline:export', $text);
+        $this->assertStringContainsString('rules:validate', $text);
         $this->assertStringContainsString('metrics:show', $text);
         $this->assertStringContainsString('metrics:export', $text);
         $this->assertStringContainsString('metrics:reset', $text);
+    }
+
+    public function testRulesValidatePassesForBundledRules(): void
+    {
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php rules:validate';
+        exec($command, $output, $exitCode);
+
+        $text = implode("\n", $output);
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Rule status: ok', $text);
+    }
+
+    public function testRulesValidateCanOutputJson(): void
+    {
+        $command = escapeshellarg(PHP_BINARY) . ' fire.php rules:validate --json';
+        exec($command, $output, $exitCode);
+
+        $decoded = json_decode(implode("\n", $output), true);
+        $this->assertSame(0, $exitCode);
+        $this->assertIsArray($decoded);
+        $this->assertTrue($decoded['ok']);
+        $this->assertGreaterThan(0, $decoded['total']);
+    }
+
+    public function testRulesValidateFailsForInvalidRuleFile(): void
+    {
+        $path = sys_get_temp_dir() . '/fireline-invalid-rules-' . uniqid('', true) . '.php';
+        file_put_contents($path, "<?php\n\nreturn [[\n    'id' => 'BAD_REGEX',\n    'type' => 'regex',\n    'pattern' => '/unterminated',\n    'score' => 1,\n    'category' => 'sqli',\n    'paranoia' => 'low',\n    'explanation' => 'test',\n    'examples' => ['x'],\n    'false_positives' => ['y'],\n]];\n");
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php rules:validate ' . escapeshellarg($path);
+            exec($command, $output, $exitCode);
+
+            $text = implode("\n", $output);
+            $this->assertSame(1, $exitCode);
+            $this->assertStringContainsString('Rule status: error', $text);
+            $this->assertStringContainsString('Regex pattern is invalid.', $text);
+        } finally {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
     }
 
     public function testReplayCiModeReturnsZeroWhenNoRegressionsExist(): void
@@ -96,6 +139,111 @@ class CliReplayTest extends TestCase
         $this->assertIsArray($decoded);
         $this->assertSame(0, $decoded['total']);
         $this->assertArrayHasKey('regressions', $decoded);
+    }
+
+    public function testReplayRunCanWriteJsonReport(): void
+    {
+        $report = sys_get_temp_dir() . '/fireline-replay-report-' . uniqid('', true) . '.json';
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php replay:run ' . escapeshellarg($this->path) . ' --output ' . escapeshellarg($report);
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(0, $exitCode);
+            $this->assertFileExists($report);
+            $this->assertStringContainsString('Report written:', implode("\n", $output));
+            $decoded = json_decode((string) file_get_contents($report), true);
+            $this->assertIsArray($decoded);
+            $this->assertSame(0, $decoded['total']);
+            $this->assertArrayHasKey('score_deltas', $decoded['summary']);
+        } finally {
+            if (is_file($report)) {
+                unlink($report);
+            }
+        }
+    }
+
+    public function testReplayRunRefusesToOverwriteReportWithoutForce(): void
+    {
+        $report = sys_get_temp_dir() . '/fireline-replay-report-' . uniqid('', true) . '.json';
+        file_put_contents($report, '{"existing":true}');
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php replay:run ' . escapeshellarg($this->path) . ' --output ' . escapeshellarg($report);
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(1, $exitCode);
+            $this->assertStringContainsString('use --force to overwrite', implode("\n", $output));
+            $this->assertSame(['existing' => true], json_decode((string) file_get_contents($report), true));
+        } finally {
+            if (is_file($report)) {
+                unlink($report);
+            }
+        }
+    }
+
+    public function testReplayRunCanOverwriteReportWithForce(): void
+    {
+        $report = sys_get_temp_dir() . '/fireline-replay-report-' . uniqid('', true) . '.json';
+        file_put_contents($report, '{"existing":true}');
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php replay:run ' . escapeshellarg($this->path) . ' --output ' . escapeshellarg($report) . ' --force';
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(0, $exitCode);
+            $decoded = json_decode((string) file_get_contents($report), true);
+            $this->assertIsArray($decoded);
+            $this->assertArrayNotHasKey('existing', $decoded);
+            $this->assertArrayHasKey('summary', $decoded);
+        } finally {
+            if (is_file($report)) {
+                unlink($report);
+            }
+        }
+    }
+
+    public function testReplayRunCiWritesReportBeforeFailing(): void
+    {
+        $report = sys_get_temp_dir() . '/fireline-replay-report-' . uniqid('', true) . '.json';
+        file_put_contents($this->path, json_encode([
+            'request' => [
+                'route' => '/search',
+                'method' => 'GET',
+                'uri' => '/search?q=test',
+            ],
+            'results' => [
+                [
+                    'field' => 'get.q',
+                    'source' => 'get',
+                    'value' => '1 union select password from users',
+                    'normalized' => '1 union select password from users',
+                    'score' => 1,
+                    'matches' => [],
+                    'breakdown' => [],
+                ],
+            ],
+            'decision' => [
+                'blocked' => false,
+                'reason' => 'allowed',
+                'score' => 1,
+            ],
+        ]) . PHP_EOL);
+
+        try {
+            $command = escapeshellarg(PHP_BINARY) . ' fire.php replay:run ' . escapeshellarg($this->path) . ' --output=' . escapeshellarg($report) . ' --ci';
+            exec($command, $output, $exitCode);
+
+            $this->assertSame(1, $exitCode);
+            $this->assertFileExists($report);
+            $decoded = json_decode((string) file_get_contents($report), true);
+            $this->assertIsArray($decoded);
+            $this->assertSame('new_block', $decoded['regressions'][0]['type']);
+        } finally {
+            if (is_file($report)) {
+                unlink($report);
+            }
+        }
     }
 
     public function testReplayRunJsonKeepsCiExitCode(): void
@@ -237,6 +385,8 @@ class CliReplayTest extends TestCase
         $this->assertStringContainsString('Metadata Changed: yes', $text);
         $this->assertStringContainsString('Metadata Diff:', $text);
         $this->assertStringContainsString('rules', $text);
+        $this->assertStringContainsString('Decision changes:', $text);
+        $this->assertStringContainsString('Score deltas:', $text);
     }
 
     public function testBaselineBuildCanOutputJson(): void

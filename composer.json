@@ -49,6 +49,7 @@
   },
   "scripts": {
     "lint": "find . -maxdepth 3 -type f -name '*.php' -not -path './vendor/*' -not -path './backup/*' -exec php -l {} \\;",
+    "rules:validate": "php fire.php rules:validate",
     "smoke": "php tests/smoke.php",
     "test": "vendor/bin/phpunit"
   },

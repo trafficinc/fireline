@@ -153,6 +153,9 @@ class ReplayTest extends TestCase
         $this->assertSame('new_block', $result['regressions'][0]['type']);
         $this->assertSame(1, $result['summary']['by_type']['new_block']);
         $this->assertSame(1, $result['summary']['by_route']['/search']);
+        $this->assertSame(1, $result['summary']['decision_changes']['allowed_to_blocked']);
+        $this->assertSame(1, $result['summary']['score_deltas']['increased']);
+        $this->assertGreaterThan(0, $result['summary']['score_deltas']['total_delta']);
         $this->assertGreaterThanOrEqual(25, $result['regressions'][0]['current_score']);
     }
 
@@ -164,6 +167,7 @@ class ReplayTest extends TestCase
         $this->assertSame(0, $result['invalid']);
         $this->assertSame([], $result['regressions']);
         $this->assertSame(0, $result['summary']['total']);
+        $this->assertSame(0, $result['summary']['score_deltas']['average_delta']);
         $this->assertArrayHasKey('current', $result['metadata']);
     }
 
@@ -265,6 +269,8 @@ class ReplayTest extends TestCase
         $this->assertSame('missed_block', $result['regressions'][0]['type']);
         $this->assertTrue($result['regressions'][0]['previous_blocked']);
         $this->assertFalse($result['regressions'][0]['current_blocked']);
+        $this->assertSame(1, $result['summary']['decision_changes']['blocked_to_allowed']);
+        $this->assertSame(1, $result['summary']['score_deltas']['decreased']);
     }
 
     public function testRunnerPreservesRequestLimitBlocks(): void

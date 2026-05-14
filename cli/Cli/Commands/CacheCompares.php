@@ -6,16 +6,33 @@ use Cli\Dumper;
 use DirectoryIterator;
 
 class CacheCompares {
+    private const ACTIVE_COMPARE_FILES = [
+        'bots.php',
+        'ips.php',
+        'ips_white_list.php',
+        'ip_block_by_country.php',
+    ];
+
+    private $comparesDirectory;
+    private $cacheDirectory;
+
+    public function __construct(?string $comparesDirectory = null, ?string $cacheDirectory = null)
+    {
+        $root = dirname(dirname(dirname(__DIR__)));
+        $this->comparesDirectory = $comparesDirectory ?? $root . '/src/Compares';
+        $this->cacheDirectory = $cacheDirectory ?? $root . '/storage/cache';
+    }
 
     public function go() {
-        $directory = dirname(dirname(dirname(__DIR__))) . '/src/Compares';
+        $directory = $this->comparesDirectory;
         $dir = new DirectoryIterator($directory);
         foreach ($dir as $fileinfo) {
-            if ($fileinfo->getFilename() !== '.' && $fileinfo->getFilename() !== '..'){
-
-                $array = explode("\n", file_get_contents($directory ."/".$fileinfo->getFilename()));
-                $this->writeToFile($array, $fileinfo->getFilename());
+            if (!$fileinfo->isFile() || !in_array($fileinfo->getFilename(), self::ACTIVE_COMPARE_FILES, true)) {
+                continue;
             }
+
+            $array = explode("\n", file_get_contents($directory ."/".$fileinfo->getFilename()));
+            $this->writeToFile($array, $fileinfo->getFilename());
         }
 
     }
@@ -31,7 +48,11 @@ class CacheCompares {
 
         preg_match('/(.*)\.[^.]+$/', $fileName, $matches);
 
-        $file = dirname(dirname(dirname(__DIR__))) . '/storage/cache/'.$matches[1].'.php';
+        if (!is_dir($this->cacheDirectory)) {
+            mkdir($this->cacheDirectory, 0775, true);
+        }
+
+        $file = $this->cacheDirectory.'/'.$matches[1].'.php';
         $res = file_put_contents($file,  $statement, LOCK_EX);
         if ($res > 0) {
             echo "$matches[1].php  Cached [ok]\n";
@@ -39,15 +60,17 @@ class CacheCompares {
     }
 
     public function clear(): string {
-        $directory = dirname(dirname(dirname(__DIR__))) . '/storage/cache';
+        $directory = $this->cacheDirectory;
+        if (!is_dir($directory)) {
+            return "No cache files, nothing to delete.";
+        }
+
         $dir = new DirectoryIterator($directory);
         $checks = 0;
         foreach ($dir as $fileinfo) {
-            if ($fileinfo->getFilename() !== '.' && $fileinfo->getFilename() !== '..'){
-                if ( file_exists($directory . '/'.$fileinfo->getFilename()) ){
-                    $checks += 1;
-                    unlink($directory . '/'.$fileinfo->getFilename());
-                }
+            if ($this->isActiveCacheFile($fileinfo->getFilename()) && file_exists($directory . '/'.$fileinfo->getFilename())){
+                $checks += 1;
+                unlink($directory . '/'.$fileinfo->getFilename());
             }
         }
         if ($checks > 0){
@@ -58,14 +81,16 @@ class CacheCompares {
     }
 
     public function check() : bool {
-        $directory = dirname(dirname(dirname(__DIR__))) . '/storage/cache';
+        $directory = $this->cacheDirectory;
+        if (!is_dir($directory)) {
+            return false;
+        }
+
         $dir = new DirectoryIterator($directory);
         $checks = 0;
         foreach ($dir as $fileinfo) {
-            if ($fileinfo->getFilename() !== '.' && $fileinfo->getFilename() !== '..'){
-                if ( file_exists($directory . '/'.$fileinfo->getFilename()) ){
-                    $checks += 1;
-                }
+            if ($this->isActiveCacheFile($fileinfo->getFilename()) && file_exists($directory . '/'.$fileinfo->getFilename())){
+                $checks += 1;
             }
         }
         if ($checks > 0) {
@@ -73,6 +98,11 @@ class CacheCompares {
         } else {
             return false;
         }
+    }
+
+    private function isActiveCacheFile(string $filename): bool
+    {
+        return in_array($filename, self::ACTIVE_COMPARE_FILES, true);
     }
 
 }
