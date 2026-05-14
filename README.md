@@ -35,4 +35,4 @@ __whitelist__: will activate the whitelist (see `src/Compares/ips_white_list.php
 
 Other included filters: Bot blacklist, Query protection, SQL injection, and XSS. 
 
-> Requirements: PHP < 7.1 
+> Requirements: PHP: 7.1 or greater
