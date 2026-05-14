@@ -67,4 +67,18 @@ class WafEngineTest extends TestCase
         $this->assertSame('bot', $decision->reason());
         $this->assertSame(['bot_guard' => 25], $decision->matchedResult()['breakdown']);
     }
+
+    public function testBlocksRequestBeforeScanningWhenLimitsAreExceeded(): void
+    {
+        $_GET = [
+            'a' => '1',
+            'b' => '2',
+        ];
+
+        $decision = (new WafEngine(['max_fields' => 1]))->inspectCurrentRequest();
+
+        $this->assertTrue($decision->shouldBlock());
+        $this->assertSame('request_limit', $decision->reason());
+        $this->assertSame('REQUEST_LIMIT_MAX_FIELDS', $decision->matchedResult()['matches'][0]['id']);
+    }
 }

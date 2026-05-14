@@ -25,12 +25,21 @@ class ConfigCheckerTest extends TestCase
         $result = (new ConfigChecker(dirname(__DIR__, 2)))->check([
             'paranoia_level' => 'maximum',
             'score_threshold' => 0,
+            'max_fields' => 0,
             'replay_path' => sys_get_temp_dir() . '/fireline-replay.ndjson',
         ]);
 
+        $scoreCheck = array_values(array_filter($result['checks'], function (array $check): bool {
+            return $check['name'] === 'score_threshold';
+        }))[0];
+        $fieldsCheck = array_values(array_filter($result['checks'], function (array $check): bool {
+            return $check['name'] === 'max_fields';
+        }))[0];
+
         $this->assertFalse($result['ok']);
         $this->assertSame('error', $result['checks'][0]['status']);
-        $this->assertSame('error', $result['checks'][1]['status']);
+        $this->assertSame('error', $scoreCheck['status']);
+        $this->assertSame('error', $fieldsCheck['status']);
     }
 
     public function testAllowsMissingDirectoryWhenParentIsWritable(): void

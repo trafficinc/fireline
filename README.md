@@ -89,6 +89,10 @@ return [
     'ip_by_country' => false,
     'whitelist' => false,
     'trusted_proxies' => [],
+    'max_fields' => 200,
+    'max_headers' => 100,
+    'max_header_length' => 8192,
+    'max_body_length' => 1048576,
     'max_value_length' => 8192,
     'inspect_json' => true,
     'inspect_headers' => true,
@@ -106,6 +110,10 @@ Config options:
 - `ip_by_country`: enables country blocking using `src/GeoLite2-Country.mmdb` and [src/Compares/ip_block_by_country.php](src/Compares/ip_block_by_country.php).
 - `whitelist`: enables IP whitelist mode using [src/Compares/ips_white_list.php](src/Compares/ips_white_list.php). When enabled, IP blacklist mode is not used.
 - `trusted_proxies`: proxy IPs or CIDR ranges allowed to supply `X-Forwarded-For`.
+- `max_fields`: maximum extracted fields before the request is blocked.
+- `max_headers`: maximum HTTP headers before the request is blocked.
+- `max_header_length`: maximum bytes allowed for an individual header value.
+- `max_body_length`: maximum raw request body bytes before the request is blocked.
 - `max_value_length`: maximum characters inspected per request value.
 - `inspect_json`: inspects JSON request bodies for `application/json` requests.
 - `inspect_headers`: inspects HTTP headers, excluding `Cookie` because cookies are inspected separately.
@@ -123,14 +131,15 @@ Config options:
 The current engine follows a staged inspection pipeline:
 
 1. Extract request fields individually.
-2. Normalize each field once.
-3. Build a route/field/shape fingerprint.
-4. Check short-lived safe cache.
-5. Run cheap prefilters and heuristics.
-6. Run keyword scanning.
-7. Run regex rules only after suspicious signals.
-8. Score and decide.
-9. Log and block, or allow the application to continue.
+2. Reject requests that exceed configured limits or contain malformed encoding.
+3. Normalize each field once.
+4. Build a route/field/shape fingerprint.
+5. Check short-lived safe cache.
+6. Run cheap prefilters and heuristics.
+7. Run keyword scanning.
+8. Run regex rules only after suspicious signals.
+9. Score and decide.
+10. Log and block, or allow the application to continue.
 
 The public `FireLine` class remains available for existing integrations, but internally delegates to `Fireline\Engine\WafEngine`.
 

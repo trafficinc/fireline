@@ -37,6 +37,12 @@ class WafEngine
         $request = $this->extractor->capture();
         $context = new RequestContext($request);
 
+        $limitResult = (new RequestLimits($this->config, $this->thresholds->blockThreshold()))->inspect($request);
+        if ($limitResult !== null) {
+            $context->addResult($limitResult);
+            return $this->finalizeDecision(Decision::block($context, 'request_limit', $limitResult));
+        }
+
         $legacyDecision = $this->inspectLegacyGuards($request, $context);
         if ($legacyDecision !== null) {
             return $this->finalizeDecision($legacyDecision);
@@ -147,6 +153,10 @@ class WafEngine
             'ip_by_country' => false,
             'whitelist' => false,
             'trusted_proxies' => [],
+            'max_fields' => 200,
+            'max_headers' => 100,
+            'max_header_length' => 8192,
+            'max_body_length' => 1048576,
             'max_value_length' => 8192,
             'inspect_json' => true,
             'inspect_headers' => true,
@@ -187,6 +197,10 @@ class WafEngine
         }
 
         $configs['max_value_length'] = max(1, (int) ($configs['max_value_length'] ?? $this->defaultConfig()['max_value_length']));
+
+        foreach (['max_fields', 'max_headers', 'max_header_length', 'max_body_length'] as $key) {
+            $configs[$key] = max(1, (int) ($configs[$key] ?? $this->defaultConfig()[$key]));
+        }
 
         foreach (['score_threshold', 'regex_threshold', 'safe_cache_threshold'] as $key) {
             if ($configs[$key] !== null) {

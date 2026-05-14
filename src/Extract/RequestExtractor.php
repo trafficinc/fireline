@@ -5,6 +5,7 @@ namespace Fireline\Extract;
 class RequestExtractor
 {
     protected $config;
+    protected $rawBodyLength = 0;
 
     public function __construct(array $config)
     {
@@ -26,6 +27,7 @@ class RequestExtractor
             'referer' => get_referer(),
             'query_string' => get_query_string(),
             'body' => $body,
+            'raw_body_length' => $this->rawBodyLength,
             'fields' => $this->fields($headers, $body),
         ];
     }
@@ -51,8 +53,11 @@ class RequestExtractor
     {
         $body = file_get_contents('php://input');
         if ($body === false || $body === '') {
+            $this->rawBodyLength = 0;
             return '';
         }
+
+        $this->rawBodyLength = strlen((string) $body);
 
         return $this->cap((string) $body);
     }

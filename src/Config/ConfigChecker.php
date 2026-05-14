@@ -16,6 +16,11 @@ class ConfigChecker
         $config = array_merge($this->defaults(), $this->loadConfig(), $config);
         $checks = [
             $this->paranoia($config),
+            $this->positiveInteger('max_fields', $config),
+            $this->positiveInteger('max_headers', $config),
+            $this->positiveInteger('max_header_length', $config),
+            $this->positiveInteger('max_body_length', $config),
+            $this->positiveInteger('max_value_length', $config),
             $this->threshold('score_threshold', $config),
             $this->threshold('regex_threshold', $config),
             $this->threshold('safe_cache_threshold', $config),
@@ -37,6 +42,11 @@ class ConfigChecker
     {
         return [
             'paranoia_level' => 'medium',
+            'max_fields' => 200,
+            'max_headers' => 100,
+            'max_header_length' => 8192,
+            'max_body_length' => 1048576,
+            'max_value_length' => 8192,
             'replay_path' => $this->root . '/storage/replay/traffic.ndjson',
             'score_threshold' => null,
             'regex_threshold' => null,
@@ -90,6 +100,18 @@ class ConfigChecker
             'name' => $key,
             'status' => $valid ? 'ok' : 'error',
             'message' => $valid ? 'Override: ' . (int) $value : 'Must be a positive integer or null',
+        ];
+    }
+
+    protected function positiveInteger(string $key, array $config): array
+    {
+        $value = $config[$key] ?? null;
+        $valid = is_numeric($value) && (int) $value > 0;
+
+        return [
+            'name' => $key,
+            'status' => $valid ? 'ok' : 'error',
+            'message' => $valid ? 'Using ' . (int) $value : 'Must be a positive integer',
         ];
     }
 
