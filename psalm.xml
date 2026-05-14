@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<psalm
+useDocblockTypes="false"
+errorLevel="7"
+>
+    <projectFiles>
+        <directory name="src" />
+        <directory name="cli" />
+        <ignoreFiles>
+            <file name="src/GeoLite2-Country.mmdb" />
+            <file name="src/geoip2.phar" />
+            <directory name="src/Compares"/>
+        </ignoreFiles>
+    </projectFiles>
+</psalm>

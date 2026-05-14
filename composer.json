@@ -1,0 +1,9 @@
+{
+    "require-dev": {
+        "psalm/phar": "^3.12"
+    },
+  "require": {
+    "ext-json": "*",
+    "ext-apache": "*"
+  }
+}
