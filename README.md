@@ -239,6 +239,12 @@ foreach ($result['regressions'] as $regression) {
 
 Replay uses the stored normalized fields and re-scores them with the current engine, which helps catch new blocks, score increases, and false-positive regressions before deployment.
 
+The same replay check is available from the CLI:
+
+```bash
+php fire.php replay:run storage/replay/traffic.ndjson
+```
+
 ## Rule Files
 
 Rules are stored in [src/Compares](src/Compares):
@@ -359,7 +365,7 @@ composer run smoke
 composer run lint
 ```
 
-The legacy `fire.php` CLI currently exposes `help`. The cache commands shown in that help output are placeholders and are not currently registered.
+The `fire.php` CLI exposes `help` and `replay:run`.
 
 ## Troubleshooting
 
