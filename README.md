@@ -193,6 +193,8 @@ Paranoia levels provide adoption-friendly defaults:
 
 Explicit `score_threshold`, `regex_threshold`, and `safe_cache_threshold` values override the level defaults.
 
+Rules also declare a `paranoia` level. Fireline only runs rules at or below the configured level, so `low` mode uses the highest-confidence rules while `strict` mode includes every rule.
+
 ## Explainability
 
 Every decision can produce a developer-facing explanation:
@@ -245,6 +247,12 @@ The same replay check is available from the CLI:
 php fire.php replay:run storage/replay/traffic.ndjson
 ```
 
+Use `--ci` to return a non-zero exit code when replay regressions are found:
+
+```bash
+php fire.php replay:run storage/replay/traffic.ndjson --ci
+```
+
 Build route model candidates from replay data:
 
 ```bash
@@ -252,6 +260,12 @@ php fire.php baseline:build storage/replay/traffic.ndjson 10
 ```
 
 `baseline:build` prints a PHP `config/routes.php` fragment for review.
+
+Validate configuration and writable paths:
+
+```bash
+php fire.php config:check
+```
 
 ## Rule Files
 
@@ -373,7 +387,7 @@ composer run smoke
 composer run lint
 ```
 
-The `fire.php` CLI exposes `help`, `replay:run`, and `baseline:build`.
+The `fire.php` CLI exposes `help`, `replay:run`, `baseline:build`, and `config:check`.
 
 ## Troubleshooting
 

@@ -51,6 +51,17 @@ class NewPipelineComponentsTest extends TestCase
         $this->assertContains('XSS_JAVASCRIPT_SCHEME', array_column($matches, 'id'));
     }
 
+    public function testAhoCorasickFiltersRulesByParanoiaLevel(): void
+    {
+        AhoCorasick::reset();
+
+        $lowMatches = AhoCorasick::scan('<img src=x onerror=alert(1)>', 'low');
+        $highMatches = AhoCorasick::scan('<img src=x onerror=alert(1)>', 'high');
+
+        $this->assertNotContains('XSS_EVENT_HANDLER', array_column($lowMatches, 'id'));
+        $this->assertContains('XSS_EVENT_HANDLER', array_column($highMatches, 'id'));
+    }
+
     public function testBotGuardBlocksEmptyAndKnownBotUserAgents(): void
     {
         $guard = new BotGuard(['^-?$', '^.+(openbot)']);

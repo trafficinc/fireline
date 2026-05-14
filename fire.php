@@ -13,6 +13,7 @@ require "autoload.php";
 require "./cli/Cli/clihelpers.php";
 
 use Cli\Cli;
+use Fireline\Config\ConfigChecker;
 use Fireline\Learning\BaselineBuilder;
 use Fireline\Learning\RouteModelExporter;
 use Fireline\Replay\ReplayRunner;
@@ -47,13 +48,23 @@ $cli->registerCommand('help', function (array $argv) use ($cli) {
 +--------------+-------------------------------------------+
 |  baseline:build | Build route model candidates from replay. |
 +--------------+-------------------------------------------+
+|  config:check | Validate Fireline config and writable paths. |
++--------------+-------------------------------------------+
 |  example     |  php fire.php replay:run storage/replay/traffic.ndjson |
 +--------------+-------------------------------------------+";
     $cli->getPrinter()->display( $menu );
 });
 
 $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
-    $path = $argv[2] ?? __DIR__ . '/storage/replay/traffic.ndjson';
+    $ciMode = in_array('--ci', $argv, true);
+    $path = __DIR__ . '/storage/replay/traffic.ndjson';
+    foreach (array_slice($argv, 2) as $arg) {
+        if (strpos($arg, '--') !== 0) {
+            $path = $arg;
+            break;
+        }
+    }
+
     $result = (new ReplayRunner())->replay($path);
 
     $lines = [
@@ -94,6 +105,10 @@ $cli->registerCommand('replay:run', function (array $argv) use ($cli) {
     }
 
     $cli->getPrinter()->display(implode(PHP_EOL, $lines));
+
+    if ($ciMode && count($result['regressions']) > 0) {
+        exit(1);
+    }
 });
 
 $cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
@@ -107,6 +122,23 @@ $cli->registerCommand('baseline:build', function (array $argv) use ($cli) {
         "Route model:" . PHP_EOL .
         RouteModelExporter::toPhp($model)
     );
+});
+
+$cli->registerCommand('config:check', function (array $argv) use ($cli) {
+    $result = (new ConfigChecker(__DIR__))->check();
+    $lines = [
+        'Config status: ' . ($result['ok'] ? 'ok' : 'error'),
+    ];
+
+    foreach ($result['checks'] as $check) {
+        $lines[] = '[' . strtoupper($check['status']) . '] ' . $check['name'] . ': ' . $check['message'];
+    }
+
+    $cli->getPrinter()->display(implode(PHP_EOL, $lines));
+
+    if (!$result['ok']) {
+        exit(1);
+    }
 });
 
 $cli->runCommand($argv);

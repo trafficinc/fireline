@@ -36,6 +36,13 @@ class Rule
         return (string) ($this->data['category'] ?? '');
     }
 
+    public function paranoia(): string
+    {
+        $level = strtolower((string) ($this->data['paranoia'] ?? 'medium'));
+
+        return in_array($level, ['low', 'medium', 'high', 'strict'], true) ? $level : 'medium';
+    }
+
     public function requires(): array
     {
         return is_array($this->data['requires'] ?? null) ? $this->data['requires'] : [];

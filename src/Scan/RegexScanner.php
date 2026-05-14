@@ -8,7 +8,7 @@ use Fireline\Telemetry\RuleMetrics;
 
 class RegexScanner
 {
-    public static function scan(string $input, array $matches): int
+    public static function scan(string $input, array $matches, string $paranoia = 'strict'): int
     {
         $score = 0;
         $matchedRuleKeys = [];
@@ -17,7 +17,7 @@ class RegexScanner
             $matchedRuleKeys[] = (string) ($match['pattern'] ?? '');
         }
 
-        foreach (RuleLoader::regexRules() as $rule) {
+        foreach (RuleLoader::regexRulesFor($paranoia) as $rule) {
             /** @var Rule $rule */
             if (!self::requirementsMet($rule, $matchedRuleKeys)) {
                 continue;

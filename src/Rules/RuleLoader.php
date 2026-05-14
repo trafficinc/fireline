@@ -5,6 +5,12 @@ namespace Fireline\Rules;
 class RuleLoader
 {
     protected static $rules;
+    protected static $order = [
+        'low' => 1,
+        'medium' => 2,
+        'high' => 3,
+        'strict' => 4,
+    ];
 
     public static function all(): array
     {
@@ -29,5 +35,31 @@ class RuleLoader
     public static function regexRules(): array
     {
         return (new RuleGroup(self::all()))->byType('regex');
+    }
+
+    public static function keywordRulesFor(string $paranoia): array
+    {
+        return (new RuleGroup(self::forParanoia($paranoia)))->byType('keyword');
+    }
+
+    public static function regexRulesFor(string $paranoia): array
+    {
+        return (new RuleGroup(self::forParanoia($paranoia)))->byType('regex');
+    }
+
+    public static function forParanoia(string $paranoia): array
+    {
+        $max = self::$order[self::normalizeParanoia($paranoia)];
+
+        return array_values(array_filter(self::all(), function (Rule $rule) use ($max) {
+            return self::$order[$rule->paranoia()] <= $max;
+        }));
+    }
+
+    protected static function normalizeParanoia(string $paranoia): string
+    {
+        $paranoia = strtolower($paranoia);
+
+        return isset(self::$order[$paranoia]) ? $paranoia : 'medium';
     }
 }

@@ -122,7 +122,7 @@ class WafEngine
         $score = new ScoreAccumulator();
         $score->add('prefilter', Prefilter::analyze($normalized));
 
-        $matches = AhoCorasick::scan($normalized);
+        $matches = AhoCorasick::scan($normalized, $this->thresholds->paranoiaLevel());
         foreach ($matches as $match) {
             $score->addRule($match);
         }
@@ -134,7 +134,7 @@ class WafEngine
         $score->add('entropy_heuristics', EntropyHeuristics::analyze($normalized));
 
         if ($score->total() >= $this->thresholds->regexThreshold()) {
-            $score->add('regex', RegexScanner::scan($normalized, $matches));
+            $score->add('regex', RegexScanner::scan($normalized, $matches, $this->thresholds->paranoiaLevel()));
         }
 
         $score->add('route_model', RouteLearner::compare((string) ($request['route'] ?? ''), $field, $normalized));
