@@ -91,6 +91,11 @@ class WafEngine
                 continue;
             }
 
+            if ((string) ($stored['source'] ?? '') === 'limit') {
+                $context->addResult(ScanResult::fromArray($stored));
+                continue;
+            }
+
             $field = new RequestField(
                 (string) ($stored['field'] ?? ''),
                 (string) ($stored['value'] ?? $stored['normalized'] ?? ''),

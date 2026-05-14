@@ -167,6 +167,46 @@ class ReplayTest extends TestCase
         $this->assertFalse($result['regressions'][0]['current_blocked']);
     }
 
+    public function testRunnerPreservesRequestLimitBlocks(): void
+    {
+        $event = [
+            'request' => [
+                'route' => '/upload',
+                'method' => 'POST',
+                'uri' => '/upload',
+            ],
+            'results' => [
+                [
+                    'field' => 'request',
+                    'source' => 'limit',
+                    'value' => '',
+                    'normalized' => '',
+                    'score' => 25,
+                    'matches' => [
+                        ['id' => 'REQUEST_LIMIT_MAX_BODY_LENGTH'],
+                    ],
+                    'breakdown' => [
+                        'REQUEST_LIMIT_MAX_BODY_LENGTH' => 25,
+                    ],
+                ],
+            ],
+            'decision' => [
+                'blocked' => true,
+                'reason' => 'request_limit',
+                'score' => 25,
+            ],
+        ];
+        file_put_contents($this->path, json_encode($event) . PHP_EOL);
+
+        $result = (new ReplayRunner(new WafEngine([
+            'replay_enabled' => false,
+            'score_threshold' => 25,
+        ])))->replay($this->path);
+
+        $this->assertSame(1, $result['total']);
+        $this->assertSame(0, $result['summary']['regressions']);
+    }
+
     public function testRunnerReportsInvalidReplayLines(): void
     {
         file_put_contents($this->path, "{not-json}\n");
