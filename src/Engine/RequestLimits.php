@@ -3,6 +3,7 @@
 namespace Fireline\Engine;
 
 use Fireline\Extract\RequestField;
+use Fireline\Telemetry\RuleMetrics;
 
 class RequestLimits
 {
@@ -17,6 +18,8 @@ class RequestLimits
 
     public function inspect(array $request): ?ScanResult
     {
+        $started = microtime(true);
+        RuleMetrics::increment('request_limits.evaluated');
         $violations = [];
 
         $this->checkCount($violations, 'max_fields', count((array) ($request['fields'] ?? [])), (int) $this->config['max_fields']);
@@ -41,13 +44,16 @@ class RequestLimits
         $this->checkEncoding($violations, (string) ($request['body'] ?? ''), 'raw.body');
 
         if ($violations === []) {
+            RuleMetrics::timing('request_limits.inspect', (microtime(true) - $started) * 1000);
             return null;
         }
 
         $breakdown = [];
         foreach ($violations as $violation) {
             $breakdown[$violation['id']] = $this->threshold;
+            RuleMetrics::increment('request_limits.' . strtolower((string) $violation['id']));
         }
+        RuleMetrics::timing('request_limits.inspect', (microtime(true) - $started) * 1000);
 
         return new ScanResult(
             'request',

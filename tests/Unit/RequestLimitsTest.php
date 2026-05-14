@@ -2,10 +2,17 @@
 
 use Fireline\Engine\RequestLimits;
 use Fireline\Extract\RequestField;
+use Fireline\Telemetry\RuleMetrics;
 use PHPUnit\Framework\TestCase;
 
 class RequestLimitsTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        RuleMetrics::reset();
+        RuleMetrics::enable(true);
+    }
+
     public function testBlocksTooManyFields(): void
     {
         $result = (new RequestLimits($this->config(['max_fields' => 1]), 25))->inspect([
@@ -22,6 +29,11 @@ class RequestLimitsTest extends TestCase
         $this->assertNotNull($result);
         $this->assertSame('REQUEST_LIMIT_MAX_FIELDS', $result->toArray()['matches'][0]['id']);
         $this->assertSame(25, $result->score());
+
+        $snapshot = RuleMetrics::snapshot();
+        $this->assertSame(1, $snapshot['counters']['request_limits.evaluated']);
+        $this->assertSame(1, $snapshot['counters']['request_limits.request_limit_max_fields']);
+        $this->assertArrayHasKey('request_limits.inspect', $snapshot['timings']);
     }
 
     public function testBlocksOversizedBodyBeforeFieldScanning(): void

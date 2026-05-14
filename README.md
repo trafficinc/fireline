@@ -365,6 +365,7 @@ Current instrumentation tracks:
 - Regex rule execution counts
 - Regex rule match counts
 - Regex rule timings
+- Request limit evaluations and violations
 - Safe/threat cache hits and misses
 - Safe/threat cache writes
 - Manual false-positive counters
