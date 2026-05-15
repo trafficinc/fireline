@@ -23,9 +23,14 @@ Install dependencies with Composer installed globally:
 composer install
 ```
 
-## Install
+## Install Methods
 
-Place the `fireline` directory outside the public web root, then copy [config-webroot/fireline.php](config-webroot/fireline.php) into the web root.
+Fireline should load before the application handles the request. The preferred deployment is:
+
+- Keep the `fireline` package outside the public web root when the host allows it.
+- Put only a small bootstrap file in the public web root.
+- Configure PHP with `auto_prepend_file`, or call Fireline at the top of the application front controller.
+- Keep `storage/logs`, `storage/replay`, and `storage/metrics` writable by the PHP process.
 
 Example layout:
 
@@ -36,19 +41,105 @@ project/
     fireline.php
 ```
 
-Then configure PHP to prepend the copied web-root file before application requests.
+Install dependencies with Composer before deploying:
+
+```bash
+composer install --no-dev --optimize-autoloader
+```
+
+Copy [config-webroot/fireline.php](config-webroot/fireline.php) into the web root and update its include path if your layout differs.
+
+### Shared Hosting
+
+For cPanel, Plesk, and similar shared hosting, upload the package and `vendor/` directory after running Composer locally or in the host's terminal.
+
+Example layout:
+
+```text
+/home/account/fireline/
+/home/account/public_html/fireline.php
+/home/account/public_html/index.php
+```
+
+For `.user.ini` in `public_html`:
+
+```ini
+auto_prepend_file = /home/account/public_html/fireline.php
+```
 
 For `.htaccess` or Apache PHP config:
 
 ```apacheconf
-php_value auto_prepend_file "/full/path/to/public/fireline.php"
+php_value auto_prepend_file "/home/account/public_html/fireline.php"
 ```
 
-For `.user.ini`:
+Some shared hosts cache `.user.ini` changes for a few minutes. If requests are not inspected immediately, wait for PHP-FPM to reload the setting or use the host control panel to restart PHP.
+
+If the host does not allow files outside `public_html`, place the package in a protected directory and block direct web access to it. Keep replay, metrics, and logs out of publicly served paths whenever possible.
+
+### VPS Or Cloud VM
+
+On a VM, keep Fireline beside the site code and configure PHP-FPM or Apache to prepend the bootstrap.
+
+Example layout:
+
+```text
+/var/www/fireline/
+/var/www/example.com/public/fireline.php
+/var/www/example.com/public/index.php
+```
+
+Apache virtual host:
+
+```apacheconf
+php_admin_value auto_prepend_file "/var/www/example.com/public/fireline.php"
+```
+
+PHP-FPM pool:
 
 ```ini
-auto_prepend_file = fireline.php
+php_admin_value[auto_prepend_file] = /var/www/example.com/public/fireline.php
 ```
+
+Nginx does not set PHP ini values by itself. Use the PHP-FPM pool, a per-directory `.user.ini` if enabled, or call Fireline from the application's front controller.
+
+### Containers
+
+In Docker or other container builds, install Fireline during the image build and write logs, replay files, and metrics to a mounted volume.
+
+```dockerfile
+COPY fireline /app/fireline
+RUN cd /app/fireline && composer install --no-dev --optimize-autoloader
+COPY public/fireline.php /app/public/fireline.php
+```
+
+PHP ini:
+
+```ini
+auto_prepend_file = /app/public/fireline.php
+```
+
+Mount persistent storage if you want logs, metrics, or replay data to survive container replacement:
+
+```text
+/app/fireline/storage/logs
+/app/fireline/storage/replay
+/app/fireline/storage/metrics
+```
+
+### Reverse Proxies And Load Balancers
+
+When the app sits behind Cloudflare, an AWS/GCP/Azure load balancer, Nginx, HAProxy, or another trusted proxy, configure `trusted_proxies`. Fireline ignores `X-Forwarded-For` unless `REMOTE_ADDR` is trusted.
+
+```php
+'trusted_proxies' => [
+    '10.0.0.0/8',
+    '172.16.0.0/12',
+    '192.168.0.0/16',
+],
+```
+
+For public proxy networks such as Cloudflare, use the provider's published IP ranges and keep them updated. Do not trust all forwarded IP headers on an internet-facing origin.
 
 ## Web Usage
 
@@ -57,7 +148,7 @@ The web-root `fireline.php` file loads Fireline and runs it:
 ```php
 <?php
 
-include __DIR__ . '/fireline/index.php';
+include dirname(__DIR__) . '/fireline/index.php';
 $waf = new FireLine();
 $waf->run();
 ```
@@ -69,6 +160,150 @@ HTTP/1.1 403 Forbidden
 ```
 
 and exits before the application continues.
+
+## Framework Integration
+
+### Laravel Middleware
+
+Create middleware that runs before application controllers:
+
+```php
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Fireline\Engine\ResponseHandler;
+use Fireline\Engine\WafEngine;
+
+class FirelineMiddleware
+{
+    public function handle($request, Closure $next)
+    {
+        $decision = (new WafEngine(config('fireline', [])))
+            ->inspectCurrentRequest();
+
+        if ($decision->shouldBlock()) {
+            ResponseHandler::block($decision);
+            exit;
+        }
+
+        return $next($request);
+    }
+}
+```
+
+Register it early in the `web` middleware group or as global middleware. Publish Fireline settings into `config/fireline.php` if you want Laravel-native config loading.
+
+### Symfony Kernel Request Listener
+
+Register a `kernel.request` listener with a high priority so it runs before controllers:
+
+```php
+<?php
+
+namespace App\EventListener;
+
+use Fireline\Engine\WafEngine;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+
+class FirelineRequestListener
+{
+    /** @var array<string, mixed> */
+    private $config;
+
+    public function __construct(array $config = [])
+    {
+        $this->config = $config;
+    }
+
+    public function onKernelRequest(RequestEvent $event): void
+    {
+        if (method_exists($event, 'isMainRequest') && !$event->isMainRequest()) {
+            return;
+        }
+
+        $decision = (new WafEngine($this->config))->inspectCurrentRequest();
+
+        if ($decision->shouldBlock()) {
+            $event->setResponse(new Response('Blocked', 403));
+        }
+    }
+}
+```
+
+`config/services.yaml`:
+
+```text
+services:
+  App\EventListener\FirelineRequestListener:
+    arguments:
+      $config: '%fireline.config%'
+    tags:
+      - { name: kernel.event_listener, event: kernel.request, method: onKernelRequest, priority: 512 }
+```
+
+For the earliest possible coverage, `auto_prepend_file` can still be used in front of Symfony.
+
+### WordPress Bootstrap Or Plugin
+
+The earliest WordPress protection is still `auto_prepend_file`, because it runs before WordPress loads. For easier management, create a small plugin:
+
+```php
+<?php
+/**
+ * Plugin Name: Fireline WAF
+ */
+
+require_once WP_CONTENT_DIR . '/../fireline/index.php';
+
+add_action('plugins_loaded', static function (): void {
+    $waf = new FireLine();
+    $waf->run();
+}, 0);
+```
+
+Place it at:
+
+```text
+wp-content/plugins/fireline-waf/fireline-waf.php
+```
+
+Activate it in WordPress. Use `auto_prepend_file` instead when you need Fireline to inspect requests before any WordPress bootstrap code runs.
+
+### Generic Front-Controller Apps
+
+For Slim, custom MVC apps, and other front-controller projects, call Fireline at the top of `public/index.php` before the application container or router is started:
+
+```php
+<?php
+
+require dirname(__DIR__, 2) . '/fireline/index.php';
+
+$waf = new FireLine();
+$waf->run();
+
+require dirname(__DIR__) . '/app/bootstrap.php';
+
+$app->run();
+```
+
+This is less automatic than `auto_prepend_file`, but it works when the host does not allow PHP ini changes.
+
+## Production Checklist
+
+Before enabling Fireline on production traffic:
+
+- Run `composer install --no-dev --optimize-autoloader`.
+- Copy `config.php.example` to `config.php` only when defaults need to be changed.
+- Verify `storage/logs`, `storage/replay`, and `storage/metrics` permissions for the PHP user.
+- Run `php fire.php config:check` from the Fireline directory.
+- Start with `paranoia_level` set to `medium`, or `low` for applications with very low false-positive tolerance.
+- Configure `trusted_proxies` before relying on forwarded client IP headers.
+- Enable `replay_enabled` during tuning, then protect or rotate replay files because they contain normalized request data.
+- Set `metrics_path` when you want cross-request tuning data.
+- Test one benign request and one obvious blocked request, such as `?q=javascript:alert(1)`, after deployment.
 
 ## Configuration
 
@@ -478,13 +713,27 @@ php fire.php metrics:reset storage/metrics/fireline-metrics.json
 ### Requests are not being blocked
 
 - Confirm `auto_prepend_file` points to the copied web-root `fireline.php`.
+- Confirm PHP loaded the setting with `phpinfo()` or the host control panel.
 - Confirm the web-root `fireline.php` includes the correct path to `fireline/index.php`.
 - Confirm `bypass_firewall` is not set to `true`.
 - Add a temporary test query such as `?q=javascript:alert(1)` and verify a `403 Forbidden` response.
 
+### The site returns a PHP error after enabling Fireline
+
+- Confirm Composer dependencies were installed with `composer install --no-dev --optimize-autoloader`.
+- Confirm `fireline.php` uses an absolute include path that matches the deployed directory layout.
+- Confirm the PHP runtime version is PHP 7.1 or newer.
+
 ### All traffic appears to come from the proxy
 
 Set `trusted_proxies` to the IP or CIDR range of your reverse proxy. Fireline ignores `X-Forwarded-For` unless `REMOTE_ADDR` is trusted.
+
+### Legitimate traffic is blocked
+
+- Lower `paranoia_level` to `low` or raise `score_threshold` while reviewing the event.
+- Check `storage/logs/fireline.log` for the matched field, score, reason, and normalized value.
+- Enable replay temporarily, reproduce the request, and replay it after rule or route-model changes.
+- Review route models for fields that intentionally allow free text, URLs, code snippets, or search syntax.
 
 ### Country blocking blocks unexpectedly
 
@@ -495,3 +744,9 @@ Country blocking fails closed if enabled and the GeoIP database is missing or un
 - Confirm `storage/logs/fireline.log` exists.
 - Confirm it is writable by the web server user.
 - Confirm PHP has permission to write inside `storage/logs`.
+
+### Metrics or replay files are not written
+
+- Confirm `metrics_path` or `replay_path` points to a writable directory.
+- Confirm replay is enabled with `replay_enabled => true`.
+- Keep these files outside public web access because they may contain normalized request data.
